@@ -3,6 +3,21 @@ const { invoke } = window.__TAURI__.core;
 const preferences = ["voice", "folder", "ffmpeg", "python", "model"];
 let ready = false;
 
+$("preview").addEventListener("click", async () => {
+  $("preview").disabled = true;
+  $("preview-status").textContent = "기존 대본으로 Stella 음성을 생성하고 있습니다.";
+  try {
+    const audio = await invoke("preview_stella", {apiKey: $("key").value.trim()});
+    $("stella-audio").src = "data:audio/wav;base64," + audio;
+    $("stella-audio").hidden = false;
+    $("preview").hidden = true;
+    $("preview-status").textContent = "Stella · 이 창에서 다시 듣기는 무료입니다.";
+  } catch (err) {
+    $("preview-status").textContent = String(err);
+    $("preview").disabled = false;
+  }
+});
+
 function status(kind, title, body) {
   $("result").hidden = false;
   $("result").dataset.kind = kind;

@@ -265,10 +265,26 @@ fn open_output(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn preview_stella(app: AppHandle, api_key: String) -> Result<String, String> {
+    let key = if api_key.trim().is_empty() { env::var("DEEPSEEK_API_KEY").unwrap_or_default() } else { api_key };
+    if key.trim().is_empty() { return Err("DeepSeek API 키를 입력하세요.".into()); }
+    let script = app.path().resource_dir().map_err(|e| e.to_string())?.join("engine/preview-stella.mjs");
+    tauri::async_runtime::spawn_blocking(move || {
+        let out = command(&tool("SHORTS_NODE","node.exe")).env("DEEPSEEK_API_KEY", key.trim())
+            .arg(script).output().map_err(|e| e.to_string())?;
+        if !out.status.success() {
+            let err = String::from_utf8_lossy(&out.stderr);
+            return Err(err.lines().find(|s| s.starts_with("Error:")).unwrap_or("음성 서버에 연결할 수 없습니다.").to_string());
+        }
+        String::from_utf8(out.stdout).map_err(|e| e.to_string())
+    }).await.map_err(|e| e.to_string())?
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(Studio::default())
-        .invoke_handler(tauri::generate_handler![defaults, generate, open_output])
+        .invoke_handler(tauri::generate_handler![defaults, generate, open_output, preview_stella])
         .run(tauri::generate_context!())
         .expect("Blog Shorts startup failed");
 }

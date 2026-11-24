@@ -10,7 +10,7 @@
       { "label": "main", "title": "Blog Shorts", "width": 820, "height": 760, "minWidth": 520, "minHeight": 520 }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' data:; connect-src ipc: http://ipc.localhost https://ipc.localhost"
     }
   },
   "bundle": {
@@ -19,6 +19,7 @@
     "icon": ["icons/icon.ico"],
     "resources": {
       "../../*.mjs": "engine/",
+      "../../jecheon.json": "engine/jecheon.json",
       "../../voice_ai.py": "engine/voice_ai.py",
       "../../voice.ps1": "engine/voice.ps1"
     }

@@ -45,6 +45,14 @@
         <div class="actions"><span class="format">세로 9:16 <b>·</b> MP4</span><button class="primary" type="submit">숏츠 만들기</button></div>
       </fieldset>
     </form>
+    <section>
+      <h2>제천 대본 목소리 비교</h2>
+      <p>같은 10장면의 대사를 듣습니다. 블로그 주소는 생략해도 됩니다.</p>
+      <label>Supertonic 3 · 기존 영상 음성<br><audio controls preload="none" src="jecheon-supertonic.mp3"></audio></label>
+      <button type="button" id="preview">Stella 샘플 생성 · 약 10원</button>
+      <p id="preview-status" role="status"></p>
+      <audio id="stella-audio" aria-label="Stella 제천 대본" controls hidden></audio>
+    </section>
     <section id="result" hidden aria-live="polite">
       <h2 id="state"></h2><p id="message"></p>
       <button type="button" id="open" hidden>저장 폴더 열기</button>

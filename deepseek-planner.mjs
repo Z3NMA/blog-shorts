@@ -30,13 +30,48 @@ function checkedText(value, max, label) {
   return value.trim();
 }
 
+const titleLimit = 15;
+const titleSegments = new Intl.Segmenter('ko', {granularity:'grapheme'});
+const characters = text => Array.from(titleSegments.segment(text), part => part.segment);
+
+function formatHeadline(value, articleTitle) {
+  function linesOf(input) {
+    return (Array.isArray(input) ? input : [input]).filter(line => typeof line === 'string')
+      .join('\n').normalize('NFC').split(/\\r\\n|\\[nr]|\r\n|[\r\n\u2028\u2029]/u)
+      .map(line => line.replace(/[\u200b\ufeff]/gu, '').replace(/[\s\x00-\x1f\x7f]+/gu, ' ').trim())
+      .filter(Boolean);
+  }
+  function shorten(line) {
+    const chars = characters(line);
+    if (chars.length <= titleLimit) return line;
+    const prefix = chars.slice(0, titleLimit - 1);
+    const lastSpace = prefix.lastIndexOf(' ');
+    // Keep a complete word before the ellipsis when there is room.
+    if (chars[titleLimit - 1] !== ' ' && lastSpace >= titleLimit / 2) prefix.length = lastSpace;
+    return prefix.join('').trimEnd() + '…';
+  }
+  let lines = linesOf(value);
+  if (!lines.length) lines = linesOf(articleTitle);
+  if (!lines.length) return '블로그 이야기';
+  const chars = characters(lines.join(' '));
+  if (lines.length === 2 && (lines.every(line => characters(line).length <= titleLimit) ||
+      chars.length > 2 * titleLimit + 1)) return lines.map(shorten).join('\n');
+  if (chars.length <= titleLimit && !chars.includes(' ')) return chars.join('');
+
+  const middle = Math.min(titleLimit, Math.ceil(chars.length / 2));
+  const spaces = chars.flatMap((ch, i) => ch === ' ' && i <= titleLimit ? [i] : []);
+  const fits = spaces.filter(i => chars.length - i - 1 <= titleLimit);
+  const split = fits.length ? fits.reduce((a, b) => Math.abs(b - middle) < Math.abs(a - middle) ? b : a)
+    : (chars.length > 2 * titleLimit && spaces.at(-1) >= titleLimit / 2 ? spaces.at(-1) : middle);
+  return [chars.slice(0, split).join(''), chars.slice(split).join('').trimStart()]
+    .filter(Boolean).map(shorten).join('\n');
+}
+
 function checkPlan(plan, source) {
-  if (typeof plan?.title !== 'string' || !Array.isArray(plan.scenes) ||
+  if (!Array.isArray(plan?.scenes) ||
       !plan.scenes.length || plan.scenes.length > 10)
-    throw Error('DeepSeek가 사용할 수 있는 제목과 장면 목록을 반환하지 않았습니다.');
-  const titleLines = plan.title.trim().split(/\r?\n/);
-  if (titleLines.length > 2) throw Error('DeepSeek가 세 줄 이상의 제목을 반환했습니다.');
-  const title = titleLines.map(line => checkedText(line, 15, '제목')).join('\n');
+    throw Error('DeepSeek가 사용할 수 있는 장면 목록을 반환하지 않았습니다.');
+  const title = formatHeadline(plan.title, source.title);
   const scenes = plan.scenes.map(scene => {
     const candidate = source.photos.find(p => p.photo === scene?.photo);
     if (!candidate) throw Error('DeepSeek가 자료에 없는 사진 번호를 반환했습니다.');

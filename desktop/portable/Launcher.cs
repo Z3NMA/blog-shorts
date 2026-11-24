@@ -107,7 +107,7 @@ internal static class Launcher
             {
                 string hash = BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "");
                 if (!String.Equals(hash, Package.Hash, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException("파일이 손상되었습니다. blog-shorts.exe를 다시 다운로드하세요.");
+                    throw new InvalidDataException("파일이 손상되었습니다. blog-shorts.zip을 다시 내려받아 압축을 풀어 주세요.");
             }
             // The lock also covers earlier launches interrupted during extraction.
             foreach (string leftover in Directory.GetDirectories(root, "partial-*"))

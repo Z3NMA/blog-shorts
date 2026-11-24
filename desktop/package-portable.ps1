@@ -1,18 +1,15 @@
 # Run from PowerShell after compiling the Windows x64 release binary.
-[CmdletBinding(DefaultParameterSetName='SingleFile')]
+[CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$Executable,
     [Parameter(Mandatory)][string]$RuntimeDirectory,
     [Parameter(Mandatory)][string]$StageDirectory,
-    [Parameter(Mandatory,ParameterSetName='Zip')][string]$OutputZip,
-    [Parameter(Mandatory,ParameterSetName='SingleFile')][string]$FixedRuntimeDirectory,
-    [Parameter(Mandatory,ParameterSetName='SingleFile')][string]$OutputExe
+    [Parameter(Mandatory)][string]$FixedRuntimeDirectory,
+    [Parameter(Mandatory)][ValidatePattern('\.zip$')][string]$OutputZip
 )
 $ErrorActionPreference = 'Stop'
-$singleFile = $PSCmdlet.ParameterSetName -eq 'SingleFile'
-$destination = if ($singleFile) { $OutputExe } else { $OutputZip }
+$destination = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputZip)
 if (Test-Path -LiteralPath $destination) { throw "Output already exists: $destination" }
-$destination = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($destination)
 $stage = Join-Path $StageDirectory 'Blog Shorts'
 if (Test-Path -LiteralPath $stage) { throw "Choose an empty staging directory: $StageDirectory" }
 $engine = New-Item -ItemType Directory -Path (Join-Path $stage 'engine') -Force
@@ -26,10 +23,6 @@ foreach ($module in 'shorts.mjs', 'video-templates.mjs', 'deepseek-planner.mjs',
 Copy-Item -LiteralPath (Join-Path "$PSScriptRoot/.." 'fonts') -Destination $engine.FullName -Recurse
 Copy-Item -LiteralPath (Join-Path "$PSScriptRoot/.." 'layouts') -Destination $engine.FullName -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination $stage
-if (!$singleFile) {
-    Compress-Archive -LiteralPath $stage -DestinationPath $destination -CompressionLevel Optimal
-    return
-}
 
 $fixed = Get-Item -LiteralPath (Join-Path $FixedRuntimeDirectory 'msedgewebview2.exe')
 $signature = Get-AuthenticodeSignature $fixed.FullName
@@ -67,4 +60,6 @@ $launcher = Join-Path $workspace 'blog-shorts.exe'
     /reference:System.IO.Compression.dll /reference:System.Windows.Forms.dll /reference:System.Drawing.dll `
     (Join-Path $PSScriptRoot 'portable/Launcher.cs') $metadata
 if ($LASTEXITCODE -ne 0) { throw 'Single-file launcher compilation failed.' }
-[IO.File]::Move($launcher, $destination)
+$package = Join-Path $workspace ([IO.Path]::ChangeExtension([IO.Path]::GetRandomFileName(), '.zip'))
+Compress-Archive -LiteralPath $launcher -DestinationPath $package -CompressionLevel Fastest
+[IO.File]::Move($package, $destination)

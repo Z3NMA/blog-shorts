@@ -4,10 +4,10 @@ Windows에서 네이버 블로그 글 주소를 받아 한국어 세로 MP4를 �
 
 ## 영상 만들기
 
-1. [Windows x64용 blog-shorts.exe](https://github.com/Z3NMA/blog-shorts/releases/latest/download/blog-shorts.exe)를 내려받아 실행하세요. 첫 실행 때 필요한 파일을 자동으로 준비합니다. **API 키 및 저장 폴더**에서 본인 키를 입력하거나 `DEEPSEEK_API_KEY`와 `GEMINI_API_KEY` 환경 변수를 사용하세요.
-2. 공개 네이버 블로그 글 주소를 넣고 **확인**을 누르세요. 여기서 DeepSeek가 대본을 한 번 생성합니다. 첫 장면의 실제 사진, 제목, 대사로 일곱 가지 미리보기를 만듭니다.
+1. Windows x64용 `blog-shorts.zip`을 내려받아 압축을 풀고 `blog-shorts.exe`를 실행하세요. 첫 실행 때 필요한 파일을 자동으로 준비합니다. **API 키 및 저장 폴더**에서 본인 키를 입력하거나 `DEEPSEEK_API_KEY`와 `GEMINI_API_KEY` 환경 변수를 사용하세요. [배포 페이지](https://github.com/Z3NMA/blog-shorts/releases/latest)
+2. 공개 네이버 블로그 글 주소를 넣고 **확인**을 누르세요. DeepSeek가 먼저 제목과 첫 사진을 고를 후보를 제안하고, 두 번째 요청에서 선정된 제목에 맞춰 장면별 대사를 씁니다. 첫 장면의 실제 사진, 제목, 대사로 일곱 가지 미리보기를 만듭니다.
 3. 좌우로 밀거나 화살표 키·버튼으로 넘기세요. 가운데 카드가 선택됩니다. **모두 보기**에서 카드를 눌러도 됩니다.
-4. **이 스타일로 제작**을 누르면 Gemini 3.8 Flash TTS의 Leda가 쇼호스트 톤으로 읽고 FFmpeg가 MP4를 만듭니다. 앱에서 완성 영상을 재생하거나 저장 폴더를 여세요. 기본 위치는 사용자 동영상 폴더의 `Blog Shorts`입니다. 설정의 **폴더 선택**을 누르면 Windows 탐색기에서 저장 위치를 바꿀 수 있습니다.
+4. **이 스타일로 제작**을 누르면 Gemini 3.8 Flash TTS의 Leda가 따뜻한 음색과 짧은 호흡으로 평소 대화보다 조금 빠르게 읽고 FFmpeg가 MP4를 만듭니다. 앱에서 완성 영상을 재생하거나 저장 폴더를 여세요. 기본 위치는 사용자 동영상 폴더의 `Blog Shorts`입니다. 설정의 **폴더 선택**을 누르면 Windows 탐색기에서 저장 위치를 바꿀 수 있습니다.
 
 현재 글을 열어 둔 동안 **스타일 다시 고르기**로 새 파일을 만들면 기존 사진·대본·음성을 재사용합니다. 다른 글을 확인하거나 앱을 닫으면 임시 작업을 정리합니다. 대본과 선택한 스타일은 완성 파일 옆의 `.plan.json`에도 저장됩니다.
 
@@ -33,10 +33,10 @@ npm exec --yes --package=@tauri-apps/cli@2 -- tauri dev
 npm exec --yes --package=@tauri-apps/cli@2 -- tauri build
 ```
 
-단일 파일을 패키징할 때는 Windows x64 릴리즈 빌드, 기존 포터블 런타임 폴더(`node.exe`, `ffmpeg.exe`, `WebView2Loader.dll`, `notices`), Microsoft의 x64 Fixed Version Runtime CAB를 푼 폴더(`msedgewebview2.exe` 포함)를 준비하세요. 배포를 갱신할 때 고정 런타임 버전도 함께 갱신하세요. [Microsoft 배포 가이드](https://learn.microsoft.com/microsoft-edge/webview2/concepts/distribution)
+Windows 배포 파일은 항상 `blog-shorts.exe` 한 개를 담은 `blog-shorts.zip`으로 제공합니다. Windows x64 릴리즈 빌드, 기존 포터블 런타임 폴더(`node.exe`, `ffmpeg.exe`, `WebView2Loader.dll`, `notices`), Microsoft의 x64 Fixed Version Runtime CAB를 푼 폴더(`msedgewebview2.exe` 포함)를 준비하세요. 배포를 갱신할 때 고정 런타임 버전도 함께 갱신하세요. [Microsoft 배포 가이드](https://learn.microsoft.com/microsoft-edge/webview2/concepts/distribution)
 
 ```powershell
-.\package-portable.ps1 -Executable .\src-tauri\target\release\blog-shorts.exe -RuntimeDirectory .\release-tools -FixedRuntimeDirectory .\webview-x64 -StageDirectory .\stage -OutputExe .\blog-shorts.exe
+.\package-portable.ps1 -Executable .\src-tauri\target\release\blog-shorts.exe -RuntimeDirectory .\release-tools -FixedRuntimeDirectory .\webview-x64 -StageDirectory .\stage -OutputZip .\blog-shorts.zip
 ```
 
 v0.2.0 사용자용 설치본은 추가 설정 `src-tauri/release.windows.json`으로 패키징합니다. `src-tauri/release-runtime`에 Windows x64용 Node.js 24.22.3의 node.exe, FFmpeg 9.0.2 essentials의 ffmpeg.exe, WebView2Loader.dll 및 notices 폴더의 배포 고지를 준비한 다음 위 빌드 명령에 `--config src-tauri/release.windows.json`을 추가하세요. 앱과 필수 실행 파일을 현재 사용자용으로 설치합니다.

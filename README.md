@@ -4,11 +4,11 @@
 
 ## 데스크톱 앱
 
-Windows 10/11 x64에서는 **blog-shorts.exe** 한 파일을 내려받아 실행하세요. 첫 실행 때 앱이 사용자 폴더에 Node.js, FFmpeg, 글꼴과 WebView2를 풀고 다음 실행부터 재사용합니다. [Windows 단일 실행 파일 다운로드](https://github.com/Z3NMA/blog-shorts/releases/latest/download/blog-shorts.exe)
+Windows 10/11 x64에서는 **blog-shorts.zip**을 내려받아 압축을 풀고 **blog-shorts.exe**를 실행하세요. 첫 실행 때 앱이 사용자 폴더에 Node.js, FFmpeg, 글꼴과 WebView2를 풀고 다음 실행부터 재사용합니다. [Windows 배포 페이지](https://github.com/Z3NMA/blog-shorts/releases/latest)
 
-Windows용 Tauri 앱에서 블로그 주소와 DeepSeek·Gemini API 키를 입력합니다. Rust가 로컬 렌더러를 실행합니다. DeepSeek Flash에는 글 제목, 사진 번호와 주변 문장을 보내 제목·사진 순서·대사를 한 번에 요청합니다. v0.2.1부터 음성 합성에 보낸 대사를 화면에도 그대로 표시합니다. 긴 대사는 최대 두 줄씩 나누어 보여줍니다. 앱에서 영상을 만들 때 ChatGPT나 Codex 호출은 발생하지 않습니다.
+Windows용 Tauri 앱에서 블로그 주소와 DeepSeek·Gemini API 키를 입력합니다. Rust가 로컬 렌더러를 실행합니다. DeepSeek Flash는 새 글마다 두 번 호출됩니다. 첫 요청에서 글 제목과 사진 주변 문장을 읽고 제목과 첫 사진 후보를 추천순으로 제안합니다. 앱은 원문 인용이 확인된 첫 후보를 고릅니다. 두 번째 요청에서 해당 제목이 궁금하게 만든 내용을 첫 대사로 풀고 다음 장면을 씁니다. 음성 합성에 보낸 대사를 화면에도 그대로 표시합니다. 긴 대사는 최대 두 줄씩 나누어 보여줍니다. 앱에서 영상을 만들 때 ChatGPT나 Codex 호출은 발생하지 않습니다.
 
-앱 내 내레이션은 Gemini 3.8 Flash TTS의 Leda로 고정됩니다. 조금 높은 피치의 밝고 귀여운 여성 쇼호스트처럼 읽도록 모든 장면에 같은 말투 지시를 보냅니다. 자막과 음성에는 같은 대사를 사용합니다. CLI에서도 `SHORTS_VOICE=gemini`와 `GEMINI_API_KEY`를 설정하면 같은 내레이션을 렌더링합니다. [Google 음성 생성 문서](https://ai.google.dev/gemini-api/docs/speech-generation)
+앱 내 내레이션은 Gemini 3.8 Flash TTS의 Leda가 따뜻하고 차분하게 읽습니다. 음성 생성 시 평소 대화보다 약 10% 빠르게 말하고 뜻이 바뀔 때만 짧게 쉬며 어미를 간결하게 맺도록 지시합니다. 기본 음높이는 살짝 낮게 잡고 핵심 단어에서만 음을 조금 올립니다. CLI에서도 `SHORTS_VOICE=gemini`와 `GEMINI_API_KEY`를 설정하면 같은 내레이션을 렌더링합니다. [Google 음성 생성 문서](https://ai.google.dev/gemini-api/docs/speech-generation)
 
 글 주소를 확인하면 DeepSeek가 대본을 생성하고 첫 장면을 일곱 가지 스타일로 미리 보여줍니다. 중앙 슬라이드나 **모두 보기**에서 고른 스타일로 제작하세요. 같은 글의 완성 화면에서 스타일을 다시 고르면 사진·대본·음성을 재사용합니다. 스타일마다 사진 영역, 제목, 자막 및 배경이 함께 바뀝니다. CLI의 `SHORTS_TEMPLATE` 값은 `white`, `paper`, `grid`, `browser`, `blue`, `contrast`, `full`입니다. 세로 MP4와 미리보기는 같은 렌더링 정의를 사용합니다.
 
@@ -20,7 +20,7 @@ Windows용 Tauri 앱에서 블로그 주소와 DeepSeek·Gemini API 키를 입�
 
 ### 비용과 비교 방법
 
-2026년 11월 24일 가격 기준으로 입력 3,000토큰·출력 1,000토큰에 캐시 할인을 적용하지 않은 Flash 대본 한 번은 약 $0.00105~0.00210입니다. 제천 예시 대본 327자에 DeepSeek 음성을 적용하면 할인 단가에서 약 $0.00736가 추가됩니다. 실제 비용은 토큰·글자 수와 청구 시점의 단가에 따릅니다. [대본·음성 요금표](https://api-docs.deepseek.com/quick_start/pricing/) · [음성 API 안내](https://api-docs.deepseek.com/guides/tts/)
+2026년 11월 24일 가격 기준으로 입력 3,000토큰·출력 1,000토큰에 캐시 할인을 적용하지 않은 Flash 요청 한 번은 약 $0.00105~0.00210입니다. 새 대본의 비용은 기획과 집필 두 요청의 사용량을 합산합니다. 제천 예시 대본 327자에 DeepSeek 음성을 적용하면 할인 단가에서 약 $0.00736가 추가됩니다. 실제 비용은 토큰·글자 수와 청구 시점의 단가에 따릅니다. [대본·음성 요금표](https://api-docs.deepseek.com/quick_start/pricing/) · [음성 API 안내](https://api-docs.deepseek.com/guides/tts/)
 
 같은 대본으로 음성을 비교하려면 아래 CLI의 세 번째 인수로 `jecheon.json` 또는 이전 실행에서 생성된 `plan.json`을 지정하세요. 대본 작성을 건너뛰고 동일한 문장을 읽으므로 가격·음식 이름의 발음, 문장 끝 억양, 장면 사이 호흡을 직접 비교할 수 있습니다.
 

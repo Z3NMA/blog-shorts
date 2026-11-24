@@ -1,8 +1,14 @@
 import {writeFile, rename, stat} from 'node:fs/promises';
 import path from 'node:path';
 
-const showHostVoice = 'Leda';
-const showHostStyle = 'An adult female Korean home-shopping presenter with a slightly higher speaking pitch. Bright, cute and lively, with a smile in her voice. Use a brisk conversational rhythm, crisp diction and a playful lift on the key detail. Keep names and numbers clear, volume comfortable, and the same timbre across scenes.';
+const narratorVoice = 'Leda';
+const narrationStyle = [
+  'Speak Korean in a warm, calm adult female voice, as if kindly explaining something to one listener.',
+  'Use a slightly lower speaking pitch and a narrow pitch range. Give only a key word a subtle lift when it needs emphasis, then return to the baseline.',
+  'For a short video, speak about 10% faster than everyday conversation. Start on the first word and link the words in each thought in one breath.',
+  'Take a brief pause where the meaning changes. Keep Korean sentence endings like “-요” short and relaxed, and reactions understated.',
+  'Pronounce names and numbers clearly enough to catch on the first listen. Keep the same timbre and comfortable volume across scenes.',
+].join(' ');
 
 export async function synthesizeGeminiScenes(scenes, directory, {
   apiKey = process.env.GEMINI_API_KEY,
@@ -27,10 +33,10 @@ export async function synthesizeGeminiScenes(scenes, directory, {
         model: 'gemini-3.8-flash-tts',
         input: [{type: 'user_input', content: [{
           type: 'text', text: scene.text,
-          annotations: [{type: 'speech_metadata', style: showHostStyle}],
+          annotations: [{type: 'speech_metadata', style: narrationStyle}],
         }]}],
         response_format: {type: 'audio'},
-        generation_config: {speech_config: [{voice: showHostVoice}]},
+        generation_config: {speech_config: [{voice: narratorVoice}]},
       }),
     });
     if (!response.ok) {

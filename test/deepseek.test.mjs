@@ -8,19 +8,55 @@ import {synthesizeDeepSeekScenes} from '../deepseek-voice.mjs';
 
 const photo = {lines:['따끈한 빵에 고기를 올려 먹어요.']};
 const scene = {photo:1, text:'빵과 고기를 함께 먹어요.', evidence:'빵에 고기를'};
+const opening = {title:'바비큐 한 접시\n빵에 올려 한 입', photo:1, evidence:scene.evidence};
+const completion = value => Response.json({choices:[
+  {finish_reason:'stop', message:{content:JSON.stringify(value)}}
+]});
 
-test('장면 번호와 본문 인용이 일치하는 대본만 사용한다', async () => {
+test('근거 있는 제목과 첫 사진을 먼저 고르고 다음 요청에서 그 조합으로 대사를 쓴다', async () => {
+  const calls = [];
+  const tea = {photo:2, text:'차는 따뜻하게 나와요.', evidence:'따뜻한 차'};
+  const request = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    const input = JSON.parse(body.messages[1].content);
+    calls.push(input);
+    if (calls.length === 1) {
+      assert.equal(input.opening, undefined);
+      return completion({candidates:[{...opening, evidence:'원문에 없는 가격'}, opening]});
+    }
+    assert.deepEqual(input, {...calls[0], opening});
+    return completion({openingText:scene.text, scenes:[scene, tea, tea]});
+  };
+  const plan = await createDeepSeekPlan('바비큐', '', [photo, {lines:['따뜻한 차도 나와요.']}], {apiKey:'test', request});
+  assert.equal(calls.length, 2);
+  assert.deepEqual(plan, {title:opening.title, scenes:[scene, tea]});
+});
+
+test('두 단계 모두 사진 번호와 인용을 확인한다', async () => {
+  await assert.rejects(createDeepSeekPlan('바비큐', '', [photo], {
+    apiKey:'test', request:async () => completion({candidates:[{...opening, photo:2}]})
+  }), /첫 사진/);
   function planFor(editedScene) {
-    const plan = {title:'한 입에 먹는 바비큐', scenes:[editedScene]};
-    const request = async () => Response.json({choices:[
-      {finish_reason:'stop', message:{content:JSON.stringify(plan)}}
-    ]});
-    return createDeepSeekPlan('바비큐', '', [photo], {apiKey:'test', request});
+    const request = async () => completion({openingText:scene.text, scenes:[editedScene]});
+    return createDeepSeekPlan('바비큐', '', [photo, photo], {apiKey:'test', cachedOpening:opening, request});
   }
-  assert.deepEqual((await planFor(scene)).scenes[0], scene);
-  assert.deepEqual((await planFor({...scene, caption:'예전 요약 자막'})).scenes[0], scene);
-  await assert.rejects(planFor({...scene, photo:2}), /사진 번호/);
-  await assert.rejects(planFor({...scene, evidence:'빠른 예약 필수'}), /근거/);
+  const next = {...scene, photo:2};
+  assert.deepEqual((await planFor({...next, caption:'별도 요약 자막'})).scenes[1], next);
+  await assert.rejects(planFor({...next, photo:3}), /사진 번호/);
+  await assert.rejects(planFor({...next, evidence:'빠른 예약 필수'}), /근거/);
+});
+
+test('집필이 실패하면 저장해 둔 첫 장면으로 집필만 재시도한다', async () => {
+  let cachedOpening;
+  const request = async () => cachedOpening ? new Response(null, {status:429}) : completion({candidates:[opening]});
+  await assert.rejects(createDeepSeekPlan('바비큐', '', [photo], {
+    apiKey:'test', request, onOpening:value => { cachedOpening = value; },
+  }), /429/);
+  assert.deepEqual(cachedOpening, opening);
+  const plan = await createDeepSeekPlan('바비큐', '', [photo], {
+    apiKey:'test', cachedOpening, onOpening:assert.fail, request:async () => completion({openingText:scene.text, scenes:[]}),
+  });
+  assert.deepEqual(plan, {title:opening.title, scenes:[scene]});
 });
 
 test('제목의 형식만 어긋나면 추가 요청 없이 유효한 장면과 제목을 사용한다', async () => {
@@ -38,14 +74,12 @@ test('제목의 형식만 어긋나면 추가 요청 없이 유효한 장면과 
   const segments = new Intl.Segmenter('ko', {granularity:'grapheme'});
   for (const [title, expected] of inputs) {
     let calls = 0;
-    const request = async () => {
-      assert.equal(++calls, 1);
-      return Response.json({choices:[{finish_reason:'stop',
-        message:{content:JSON.stringify({title, scenes:[scene]})}}]});
-    };
+    const request = async () => ++calls === 1
+      ? completion({candidates:[{...opening, title}]})
+      : completion({openingText:scene.text, scenes:[]});
     const plan = await createDeepSeekPlan(article, '', [photo], {apiKey:'test', request});
     const lines = plan.title.split('\n');
-    assert.equal(calls, 1);
+    assert.equal(calls, 2);
     assert.equal(lines.length, 2);
     assert.ok(lines.every(line => line && [...segments.segment(line)].length <= 15));
     assert.equal(expected.includes('\n') ? plan.title : lines.join(' '), expected);

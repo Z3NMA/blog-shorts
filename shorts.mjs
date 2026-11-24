@@ -81,7 +81,11 @@ if (session && existsSync(local('plan.json'))) {
   plan = JSON.parse(readFileSync(scriptFile,'utf8'));
 } else if (process.env.SHORTS_PLANNER === 'deepseek') {
   console.log('DeepSeek에서 대본과 사진 순서를 구성하고 있습니다.');
-  plan = await createDeepSeekPlan(title, introduction.join(' '), photos);
+  const hasOpening = session && existsSync(local('opening.json'));
+  plan = await createDeepSeekPlan(title, introduction.join(' '), photos, {
+    cachedOpening:hasOpening ? JSON.parse(readFileSync(local('opening.json'), 'utf8')) : undefined,
+    onOpening:session ? opening => save('opening.json', JSON.stringify(opening)) : undefined,
+  });
 } else {
   plan = autoPlan();
 }

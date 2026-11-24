@@ -33,8 +33,15 @@ test('Gemini sends the exact caption text per scene and saves Google WAV output'
       assert.equal(body.model, 'gemini-3.8-flash-tts');
       assert.deepEqual(body.generation_config.speech_config, [{voice: 'Leda'}]);
       assert.equal(turn.annotations[0].type, 'speech_metadata');
-      assert.match(turn.annotations[0].style, /adult female Korean home-shopping/i);
-      assert.match(turn.annotations[0].style, /higher speaking pitch/i);
+      const {style} = turn.annotations[0];
+      assert.match(style, /warm, calm/i);
+      assert.match(style, /kindly explaining/i);
+      assert.match(style, /slightly lower speaking pitch/i);
+      assert.match(style, /narrow pitch range/i);
+      assert.match(style, /only a key word a subtle lift/i);
+      assert.match(style, /10% faster than everyday conversation/i);
+      assert.match(style, /brief pause where the meaning changes/i);
+      assert.match(style, /sentence endings.*short and relaxed/i);
       sent.push(turn.text);
       return Response.json({steps: [{type: 'model_output', content: [
         {type: 'audio', data: wav.toString('base64')},

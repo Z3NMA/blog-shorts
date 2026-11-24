@@ -1,6 +1,6 @@
 const $ = (id) => document.getElementById(id);
 const { invoke } = window.__TAURI__.core;
-const preferences = ["voice", "folder", "ffmpeg", "python", "model", "geminiVoice", "geminiStyle"];
+const preferences = ["folder", "ffmpeg"];
 let ready = false;
 let defaults;
 
@@ -12,22 +12,6 @@ function status(kind, title, body) {
   $("open").hidden = kind !== "done";
 }
 
-function updateVoice() {
-  const voice = $("voice").value;
-  const gemini = voice === "gemini";
-  const local = voice === "supertonic";
-  $("gemini-options").hidden = !gemini;
-  $("gemini-credentials").hidden = !gemini;
-  $("geminiKey").required = gemini && !defaults.hasGeminiKey;
-  $("local-options").hidden = !local;
-  $("model").required = local;
-  $("python").required = local;
-  $("voice-hint").textContent = gemini ? "음성은 Google API 사용량에 따라 과금됩니다."
-    : local || voice === "windows" ? "로컬 음성 · 대본에만 API 요금이 적용됩니다."
-    : "대본과 음성에 DeepSeek API 요금이 적용됩니다.";
-}
-
-$("voice").addEventListener("change", updateVoice);
 $("form").addEventListener("invalid", (event) => {
   if ($("settings").contains(event.target)) $("settings").open = true;
 }, true);
@@ -44,11 +28,8 @@ $("form").addEventListener("submit", async (event) => {
     return;
   }
   const job = {
-    url: url.href, apiKey: $("key").value.trim(), voice: $("voice").value,
-    geminiKey: $("voice").value === "gemini" ? $("geminiKey").value.trim() : "",
-    geminiVoice: $("geminiVoice").value, geminiStyle: $("geminiStyle").value,
-    outputFolder: $("folder").value.trim(), ffmpeg: $("ffmpeg").value.trim(),
-    python: $("python").value.trim(), model: $("model").value.trim()
+    url: url.href, apiKey: $("key").value.trim(), geminiKey: $("geminiKey").value.trim(),
+    outputFolder: $("folder").value.trim(), ffmpeg: $("ffmpeg").value.trim()
   };
   try {
     localStorage.setItem("settings", JSON.stringify(Object.fromEntries(preferences.filter(p => $(p).value !== defaults[p]).map(p => [p, $(p).value]))));
@@ -76,6 +57,7 @@ $("open").addEventListener("click", async () => {
 
 try {
   defaults = await invoke("defaults");
+  $("geminiKey").required = !defaults.hasGeminiKey;
   if (defaults.hasGeminiKey) $("geminiKey").placeholder = "환경 변수 키 사용 중";
   $("key").required = !defaults.hasKey;
   if (defaults.hasKey) {
@@ -83,16 +65,12 @@ try {
     $("key-hint").textContent = "설정된 환경 변수 키로 대본을 만듭니다.";
   }
   $("folder").value = defaults.outputFolder;
-  for (const id of ["ffmpeg","python","model"]) $(id).value = defaults[id];
+  $("ffmpeg").value = defaults.ffmpeg;
   let saved;
   try { saved = JSON.parse(localStorage.getItem("settings") || "{}"); } catch { saved = {}; }
   for (const id of preferences) {
     if (typeof saved?.[id] === "string" && saved[id]) $(id).value = saved[id];
   }
-  if (!$("geminiVoice").value) $("geminiVoice").value = "Kore";
-  if (!$("geminiStyle").value) $("geminiStyle").value = "natural";
-  if (!$("voice").value) $("voice").value = "stella";
-  updateVoice();
   await window.__TAURI__.event.listen("render-progress", ({payload}) => {
     if ($("inputs").disabled) $("message").textContent = payload;
   });

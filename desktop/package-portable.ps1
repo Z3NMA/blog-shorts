@@ -18,5 +18,6 @@ foreach ($item in 'node.exe', 'ffmpeg.exe', 'WebView2Loader.dll', 'notices') {
 foreach ($module in 'shorts.mjs', 'deepseek-planner.mjs', 'deepseek-voice.mjs', 'gemini-voice.mjs', 'voice_ai.py', 'voice.ps1') {
     Copy-Item -LiteralPath (Join-Path "$PSScriptRoot/.." $module) -Destination $engine.FullName
 }
+Copy-Item -LiteralPath (Join-Path "$PSScriptRoot/.." 'fonts') -Destination $engine.FullName -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination $stage
 Compress-Archive -LiteralPath $stage -DestinationPath $OutputZip -CompressionLevel Optimal

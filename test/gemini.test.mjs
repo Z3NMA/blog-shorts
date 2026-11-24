@@ -24,16 +24,17 @@ test('Gemini sends the exact caption text per scene and saves Google WAV output'
   wav.writeUInt32LE(2, 40);
   const sent = [];
   await synthesizeGeminiScenes(scenes, dir, {
-    apiKey: 'test-key', voice: 'Aoede', style: 'calm',
+    apiKey: 'test-key',
     request: async (url, options) => {
       assert.equal(url, 'https://generativelanguage.googleapis.com/v1beta/interactions');
       assert.equal(options.headers['x-goog-api-key'], 'test-key');
       const body = JSON.parse(options.body);
       const [turn] = body.input[0].content;
       assert.equal(body.model, 'gemini-3.8-flash-tts');
-      assert.deepEqual(body.generation_config.speech_config, [{voice: 'Aoede'}]);
+      assert.deepEqual(body.generation_config.speech_config, [{voice: 'Leda'}]);
       assert.equal(turn.annotations[0].type, 'speech_metadata');
-      assert.match(turn.annotations[0].style, /calm/i);
+      assert.match(turn.annotations[0].style, /adult female Korean home-shopping/i);
+      assert.match(turn.annotations[0].style, /higher speaking pitch/i);
       sent.push(turn.text);
       return Response.json({steps: [{type: 'model_output', content: [
         {type: 'audio', data: wav.toString('base64')},

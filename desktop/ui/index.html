@@ -30,27 +30,15 @@
         <section class="group" aria-labelledby="audio-heading">
           <h2 id="audio-heading">대본과 내레이션</h2>
           <div class="card">
-            <div class="row"><div><label for="voice">음성 엔진</label><small id="voice-hint"></small></div>
-              <select id="voice" aria-describedby="voice-hint">
-                <option value="stella">DeepSeek · Stella</option><option value="tide">DeepSeek · Tide</option>
-                <option value="gemini">Gemini 3.8 Flash TTS</option>
-                <option value="supertonic">Supertonic 3</option><option value="windows">Windows 한국어</option>
-              </select>
-            </div>
-            <div class="row" id="gemini-options" hidden>
-              <div class="inline-field"><label for="geminiVoice">목소리</label><select id="geminiVoice"><option>Kore</option><option>Puck</option><option>Aoede</option></select></div>
-              <div class="inline-field"><label for="geminiStyle">말투</label><select id="geminiStyle"><option value="natural">자연스럽게</option><option value="calm">차분하게</option><option value="lively">활기차게</option></select></div>
+            <div class="row"><div><strong>내레이션</strong><small>조금 높은 톤의 발랄한 여성 쇼호스트</small></div>
+              <span>Gemini 3.8 Flash TTS</span>
             </div>
             <div class="row"><div><label for="key">DeepSeek API 키</label><small id="key-hint">대본과 장면 구성에 사용합니다.</small></div>
               <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="API 키 입력" aria-describedby="key-hint"></div>
-            <div class="row" id="gemini-credentials" hidden><div><label for="geminiKey">Gemini API 키</label><small>Google AI Studio에서 발급한 키</small></div>
+            <div class="row" id="gemini-credentials"><div><label for="geminiKey">Gemini API 키</label><small>Google AI Studio에서 발급한 키</small></div>
               <input id="geminiKey" type="password" autocomplete="off" spellcheck="false" placeholder="API 키 입력"></div>
-            <div id="local-options" hidden>
-              <div class="row"><label for="python">Python 실행 경로</label><input id="python" spellcheck="false"></div>
-              <div class="row"><label for="model">Supertonic 모델 폴더</label><input id="model" spellcheck="false"></div>
-            </div>
           </div>
-          <p class="footnote">입력한 API 키는 앱을 닫으면 지워집니다.</p>
+          <p class="footnote">대본은 DeepSeek, 음성은 Google 사용량에 따라 과금됩니다. 입력한 키는 앱을 닫으면 지워집니다.</p>
         </section>
         <details class="card" id="settings">
           <summary>저장 위치와 실행 설정</summary>

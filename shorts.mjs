@@ -16,6 +16,11 @@ const mobile = 'https://m.blog.naver.com/' + post[1] + '/' + post[2];
 const dir = mkdtempSync(path.join(tmpdir(), 'blog-shorts-'));
 const local = name => path.join(dir, name);
 const ffmpeg = process.env.FFMPEG || 'ffmpeg';
+// Relative filter paths work even when the portable application path contains a drive letter or spaces.
+mkdirSync(local('fonts'));
+for (const font of ['Pretendard-ExtraBold.otf', 'Pretendard-Bold.otf']) {
+  copyFileSync(fileURLToPath(new URL('fonts/' + font, import.meta.url)), local('fonts/' + font));
+}
 function run(cmd, args) {
   const env = {...process.env};
   delete env.DEEPSEEK_API_KEY;
@@ -67,6 +72,20 @@ if (scriptFile) {
 }
 if (!plan.scenes?.length || !plan.title || plan.scenes.some(s=>!photos[s.photo-1] || !s.text?.trim()))
   throw Error('Invalid title, photo number or narration.');
+// Older plans sometimes contain a single headline. Keep its words and split near the middle.
+const originalLines = plan.title.trim().split(/\s*\n\s*/u);
+if (originalLines.length === 1) {
+  const words = originalLines[0].split(/\s+/u);
+  if (words.length > 1) {
+    const midpoint = originalLines[0].length / 2;
+    let split = 1;
+    for (let i = 2; i < words.length; i++) {
+      if (Math.abs(words.slice(0, i).join(' ').length - midpoint) <
+          Math.abs(words.slice(0, split).join(' ').length - midpoint)) split = i;
+    }
+    plan.title = words.slice(0, split).join(' ') + '\n' + words.slice(split).join(' ');
+  }
+}
 // Older saved plans can include a separately summarized subtitle.
 for (const scene of plan.scenes) delete scene.caption;
 console.log('Photos:',photos.length,'Scenes:',plan.scenes.length,'Working files:',dir);
@@ -108,8 +127,23 @@ function stamp(sec) {
   const cs=Math.floor(sec*100);
   return '0:'+String(Math.floor(cs/6000)).padStart(2,'0')+':'+String(Math.floor(cs/100)%60).padStart(2,'0')+'.'+String(cs%100).padStart(2,'0');
 }
-const assHeader = '[Script Info]\nScriptType: v4.00+\nPlayResX: 720\nPlayResY: 1280\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\nStyle: Main,Malgun Gothic,49,&H00FFFFFF,&H00FFFFFF,&H00312018,&H80000000,-1,0,0,0,100,100,0,0,1,3,1,5,18,18,0,1\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n';
-const event = (a,b,body) => 'Dialogue: 0,'+stamp(a)+','+stamp(b)+',Main,,0,0,0,,'+body+'\n';
+const assHeader = [
+  '[Script Info]', 'ScriptType: v4.00+', 'PlayResX: 720', 'PlayResY: 1280', 'WrapStyle: 2',
+  '[V4+ Styles]',
+  'Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding',
+  'Style: Subject,Pretendard ExtraBold,74,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,-1,0,3,6,0,5,20,20,0,1',
+  'Style: Hook,Pretendard ExtraBold,74,&H00000000,&H00000000,&H00000000,&H00000000,0,0,0,0,100,100,-1,0,1,0,0,5,20,20,0,1',
+  'Style: Caption,Pretendard,48,&H00FFFFFF,&H00FFFFFF,&H00121212,&H00121212,-1,0,0,0,100,100,0,0,1,2.6,0,2,25,25,0,1',
+  '[Events]', 'Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text', ''
+].join('\n');
+const event = (start, end, style, body) => 'Dialogue: 0,' + stamp(start) + ',' + stamp(end) + ',' + style + ',,0,0,0,,' + body + '\n';
+
+function headline(line, style, y, end) {
+  // Allow short hooks to fill the header and fit the longest supported Korean titles within its margins.
+  const units = Array.from(line).reduce((n, char) => n + (char === ' ' ? 0.35 : 1), 0);
+  const size = Math.min(78, Math.floor(660 / Math.max(1, units)));
+  return event(0, end, style, '{\\pos(360,' + y + ')\\fs' + size + '}' + assText(line));
+}
 for (const [i,scene] of plan.scenes.entries()) {
   console.log(`영상 합성 · ${i + 1}/${plan.scenes.length}장면`);
   const cached = process.env.PHOTO_DIR && path.resolve(process.env.PHOTO_DIR,scene.photo+'.jpg');
@@ -121,9 +155,9 @@ for (const [i,scene] of plan.scenes.entries()) {
   const speech=Number(duration[1])*3600+Number(duration[2])*60+Number(duration[3]);
   const frames=Math.ceil((speech+0.20)*30);
   const end=frames/30;
-  const headings=plan.title.split('\n').flatMap(line=>wrap(assText(line),15));
-  const heading=headings.map((row,k)=>(k?'\\N{\\c&H41BDFF&}':'')+row).join('');
-  let ass=assHeader+event(0,end,'{\\pos(360,130)\\fs62}'+heading);
+  const [subject, ...rest] = plan.title.split('\n').filter(Boolean);
+  let ass = assHeader + headline(subject, 'Subject', rest.length ? 177 : 220, end);
+  if (rest.length) ass += headline(rest.join(' '), 'Hook', 270, end);
   const rows=wrap(scene.text,15).map(assText);
   const groups=[];
   for(let j=0;j<rows.length;j+=2) groups.push(rows.slice(j,j+2));
@@ -131,11 +165,11 @@ for (const [i,scene] of plan.scenes.entries()) {
   let elapsed=0;
   for (const [k,g] of groups.entries()) {
     const until=elapsed+speech*weight[k]/weight.reduce((a,b)=>a+b,0);
-    ass+=event(elapsed,k===groups.length-1?end:until,'{\\pos(360,985)}'+g.join('\\N'));
+    ass+=event(elapsed,k===groups.length-1?end:until,'Caption','{\\pos(360,930)}'+g.join('\\N'));
     elapsed=until;
   }
   writeFileSync(local('scene.ass'),ass);
-  const vf="scale=720:1024:force_original_aspect_ratio=increase,crop=720:1024,setsar=1,pad=720:1280:0:256:color=0x302119,loop=loop=-1:size=1:start=0,settb=1/30,setpts=N,fps=30,ass=scene.ass";
+  const vf="scale=720:632:force_original_aspect_ratio=increase,crop=720:632,setsar=1,pad=720:1280:0:326:color=white,loop=loop=-1:size=1:start=0,settb=1/30,setpts=N,fps=30,ass=scene.ass:fontsdir=fonts";
   run(ffmpeg,['-loglevel','error','-y','-i','photo','-i',i+'.wav','-vf',vf,'-af','apad','-t',String(end),'-c:v','libx264','-preset','veryfast','-crf','19','-pix_fmt','yuv420p','-c:a','aac','-ar','48000',i+'.mp4']);
 }
 writeFileSync(local('list.txt'),plan.scenes.map((_,i)=>"file '"+i+".mp4'").join('\n'));

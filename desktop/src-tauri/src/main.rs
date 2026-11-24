@@ -27,15 +27,8 @@ struct Job {
     api_key: String,
     #[serde(default)]
     gemini_key: String,
-    #[serde(default)]
-    gemini_voice: String,
-    #[serde(default)]
-    gemini_style: String,
-    voice: String,
     output_folder: String,
     ffmpeg: String,
-    python: String,
-    model: String,
 }
 
 #[derive(Serialize)]
@@ -45,8 +38,6 @@ struct Defaults {
     has_gemini_key: bool,
     output_folder: String,
     ffmpeg: String,
-    python: String,
-    model: String,
 }
 
 fn adjacent(name: &str) -> Option<PathBuf> {
@@ -75,8 +66,6 @@ fn defaults(app: AppHandle) -> Result<Defaults, String> {
         has_gemini_key: env::var("GEMINI_API_KEY").is_ok_and(|v| !v.trim().is_empty()),
         output_folder: folder.to_string_lossy().into_owned(),
         ffmpeg: tool("FFMPEG", "ffmpeg.exe"),
-        python: tool("SHORTS_PYTHON", "python.exe"),
-        model: env::var("SUPERTONIC_MODEL").unwrap_or_default(),
     })
 }
 
@@ -123,6 +112,9 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
     } else {
         job.gemini_key.trim().to_owned()
     };
+    if gemini_key.trim().is_empty() {
+        return Err("Google AI Studio에서 발급한 Gemini API 키를 입력하세요.".into());
+    }
     let folder = PathBuf::from(job.output_folder.trim());
     if !folder.is_absolute() {
         return Err("저장 폴더의 전체 경로를 입력하세요.".into());
@@ -181,44 +173,10 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
         .env("SHORTS_PLAN_PATH", plan)
         .env("FFMPEG", job.ffmpeg.trim())
         .env_remove("SUPERTONIC_MODEL")
-        .env_remove("SHORTS_VOICE")
+        .env("SHORTS_VOICE", "gemini")
+        .env("GEMINI_API_KEY", gemini_key.trim())
         .env_remove("POST_HTML")
         .env_remove("PHOTO_DIR");
-    match job.voice.as_str() {
-        "gemini" => {
-            if gemini_key.trim().is_empty() {
-                return Err("Google AI Studio에서 발급한 Gemini API 키를 입력하세요.".into());
-            }
-            if !matches!(job.gemini_voice.as_str(), "Kore" | "Puck" | "Aoede")
-                || !matches!(job.gemini_style.as_str(), "natural" | "calm" | "lively") {
-                return Err("Gemini 목소리와 말투를 다시 선택하세요.".into());
-            }
-            worker.env("SHORTS_VOICE", "gemini")
-                .env("GEMINI_API_KEY", gemini_key.trim())
-                .env("GEMINI_VOICE", &job.gemini_voice)
-                .env("GEMINI_STYLE", &job.gemini_style);
-        }
-        "stella" | "tide" => {
-            worker
-                .env("SHORTS_VOICE", "deepseek")
-                .env("DEEPSEEK_VOICE", &job.voice);
-        }
-        "supertonic" => {
-            if !Path::new(job.model.trim()).join("tts.json").is_file() {
-                return Err("Supertonic 모델 파일이 있는 폴더를 입력하세요.".into());
-            }
-            preflight(
-                job.python.trim(),
-                &["-c", "import sherpa_onnx, numpy"],
-                "Python과 sherpa-onnx",
-            )?;
-            worker
-                .env("SHORTS_PYTHON", job.python.trim())
-                .env("SUPERTONIC_MODEL", job.model.trim());
-        }
-        "windows" => (),
-        _ => return Err("음성을 다시 선택하세요.".into()),
-    }
     let mut child = worker
         .env("DEEPSEEK_API_KEY", &key)
         .stdout(Stdio::piped())

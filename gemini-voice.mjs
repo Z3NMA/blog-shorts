@@ -1,22 +1,14 @@
 import {writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
-const styles = new Map([
-  ['natural', 'Warm, conversational Korean narration at a natural pace.'],
-  ['calm', 'Calm, measured Korean narration with gentle pauses.'],
-  ['lively', 'Bright, upbeat Korean narration with clear articulation.'],
-]);
+const showHostVoice = 'Leda';
+const showHostStyle = 'An adult female Korean home-shopping presenter with a slightly higher speaking pitch. Bright, cute and lively, with a smile in her voice. Use a brisk conversational rhythm, crisp diction and a playful lift on the key detail. Keep names and numbers clear, volume comfortable, and the same timbre across scenes.';
 
 export async function synthesizeGeminiScenes(scenes, directory, {
   apiKey = process.env.GEMINI_API_KEY,
-  voice = process.env.GEMINI_VOICE || 'Kore',
-  style = process.env.GEMINI_STYLE || 'natural',
   request = fetch,
 } = {}) {
   if (!apiKey?.trim()) throw Error('Google AI Studio에서 발급한 Gemini API 키를 입력하세요.');
-  if (!styles.has(style) || !['Kore', 'Puck', 'Aoede'].includes(voice)) {
-    throw Error('Gemini 목소리와 말투 설정을 확인하세요.');
-  }
   for (const [index, scene] of scenes.entries()) {
     const label = `Gemini 음성 · ${index + 1}/${scenes.length}장면`;
     console.log(label);
@@ -29,10 +21,10 @@ export async function synthesizeGeminiScenes(scenes, directory, {
         model: 'gemini-3.8-flash-tts',
         input: [{type: 'user_input', content: [{
           type: 'text', text: scene.text,
-          annotations: [{type: 'speech_metadata', style: styles.get(style)}],
+          annotations: [{type: 'speech_metadata', style: showHostStyle}],
         }]}],
         response_format: {type: 'audio'},
-        generation_config: {speech_config: [{voice}]},
+        generation_config: {speech_config: [{voice: showHostVoice}]},
       }),
     });
     if (!response.ok) {

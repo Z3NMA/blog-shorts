@@ -7,7 +7,6 @@ let saved = {};
 try { saved = JSON.parse(localStorage.getItem('settings') || '{}') || {}; } catch {}
 function persist() {
   const settings = {folder: $('folder').value, style: saved.style};
-  if ($('ffmpeg').value !== defaults.ffmpeg) settings.ffmpeg = $('ffmpeg').value;
   try { localStorage.setItem('settings', JSON.stringify(settings)); } catch {}
 }
 const controls = ['deck','gallery','mode','modeName','arrows','prev','next','styleName','count','create','picker'];
@@ -41,7 +40,7 @@ function bindBusy(value) {
 }
 function job(url) {
   return {url, apiKey:$('key').value.trim(), geminiKey:$('geminiKey').value.trim(),
-    ffmpeg:$('ffmpeg').value.trim(), outputFolder:$('folder').value.trim()};
+    outputFolder:$('folder').value.trim()};
 }
 function postUrl(value) {
   const u = new URL(value.trim());
@@ -60,7 +59,6 @@ async function prepare() {
   const data = job(url);
   if (!data.apiKey && !defaults.hasKey && url !== preview?.url)
     return requireSetting('key','글 확인에 사용할 DeepSeek API 키를 입력하세요.');
-  if (!data.ffmpeg) return requireSetting('ffmpeg','FFmpeg 실행 경로를 입력하세요.');
   bindBusy(true);
   persist();
   status('working','미리보기 준비 중','블로그 사진과 본문을 읽고 있습니다.');
@@ -86,8 +84,7 @@ $('create').onclick = async () => {
   const data = job(preview.url), style = carousel.selected;
   if (!data.geminiKey && !defaults.hasGeminiKey && !preview.audioReady)
     return requireSetting('geminiKey','내레이션에 사용할 Google AI Studio의 Gemini API 키를 입력하세요.');
-  if (!data.outputFolder) return requireSetting('folder','완성 MP4를 저장할 폴더의 전체 경로를 입력하세요.');
-  if (!data.ffmpeg) return requireSetting('ffmpeg','FFmpeg 실행 경로를 입력하세요.');
+  if (!data.outputFolder) return requireSetting('chooseFolder','MP4를 저장할 폴더를 선택하세요.');
   bindBusy(true);
   $('settings').open = false;
   persist();
@@ -96,7 +93,6 @@ $('create').onclick = async () => {
   try {
     const file = await invoke('generate',{job:{...data,apiKey:'',token:preview.token,template:style.id}});
     preview.audioReady = true;
-    $('doneStyle').textContent = style.name;
     $('file').textContent = file;
     $('player').poster = style.image;
     $('player').src = convertFileSrc(file);
@@ -109,12 +105,27 @@ $('create').onclick = async () => {
 $('open').onclick = async () => {
   try {await invoke('open_output');} catch(e) {status('error','저장 폴더 열기 실패',String(e));}
 };
+$('folder').addEventListener('change', persist);
+$('chooseFolder').onclick = async () => {
+  const button = $('chooseFolder');
+  button.disabled = true;
+  try {
+    const folder = await invoke('choose_folder', {current: $('folder').value.trim()});
+    if (folder) {
+      $('folder').value = folder;
+      persist();
+    }
+  } catch (error) {
+    status('error', '폴더 선택 실패', String(error));
+  } finally {
+    button.disabled = false;
+  }
+};
 try {
   defaults = await invoke('defaults');
   if (defaults.hasKey) $('key').placeholder = '환경 변수 키 사용 중';
   if (defaults.hasGeminiKey) $('geminiKey').placeholder = '환경 변수 키 사용 중';
   $('folder').value = saved.folder || defaults.outputFolder;
-  $('ffmpeg').value = saved.ffmpeg || defaults.ffmpeg;
   await window.__TAURI__.event.listen('render-progress',({payload}) => {
     if (working) $('message').textContent = payload;
   });

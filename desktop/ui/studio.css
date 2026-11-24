@@ -50,7 +50,9 @@ body .tile img { display:block; margin:auto; width:100%; max-width:106px; aspect
 body .tile span { display:block; font-size:12px; font-weight:650; margin-top:5px; }
 body .tile[aria-pressed=true] { box-shadow:inset 0 0 0 2px var(--blue); }
 body .tile[aria-pressed=true] span:before { content:'✓ '; color:var(--blue); }
-body .bottom { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding-top:9px; }
+body .bottom { display:flex; justify-content:flex-end; padding-top:9px; }
+body .folder-field { min-width:0; }
+body #chooseFolder { flex:none; min-height:44px; padding:8px 14px; border-radius:12px; background:var(--base); color:var(--blue); font-weight:600; }
 body .bottom small,body .result-meta { color:var(--muted);font-size:13px; }
 body .result-body { display:flex; align-items:center; justify-content:center; gap:clamp(15px,4vw,36px); padding:18px; background:var(--card); border-radius:20px; }
 body video { width:clamp(128px,31%,200px); aspect-ratio:9/16; border-radius:11px; background:#171921; }

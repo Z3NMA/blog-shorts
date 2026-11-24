@@ -53,7 +53,6 @@ struct Job {
     #[serde(default)]
     template: String,
     output_folder: String,
-    ffmpeg: String,
 }
 
 #[derive(Serialize)]
@@ -62,7 +61,6 @@ struct Defaults {
     has_key: bool,
     has_gemini_key: bool,
     output_folder: String,
-    ffmpeg: String,
 }
 
 fn adjacent(name: &str) -> Option<PathBuf> {
@@ -90,7 +88,6 @@ fn defaults(app: AppHandle) -> Result<Defaults, String> {
         has_key: env::var("DEEPSEEK_API_KEY").is_ok_and(|v| !v.trim().is_empty()),
         has_gemini_key: env::var("GEMINI_API_KEY").is_ok_and(|v| !v.trim().is_empty()),
         output_folder: folder.to_string_lossy().into_owned(),
-        ffmpeg: tool("FFMPEG", "ffmpeg.exe"),
     })
 }
 
@@ -116,6 +113,50 @@ fn preflight(executable: &str, args: &[&str], name: &str) -> Result<(), String> 
         return Err(format!("{name} 설치와 실행 경로를 확인하세요."));
     }
     Ok(())
+}
+
+fn detect_ffmpeg() -> Result<PathBuf, String> {
+    let configured = env::var_os("FFMPEG").map(PathBuf::from);
+    let path = env::var_os("PATH").unwrap_or_default();
+    let candidates = adjacent("ffmpeg.exe")
+        .into_iter()
+        .chain(configured)
+        .chain(env::split_paths(&path).map(|dir| dir.join("ffmpeg.exe")));
+    for candidate in candidates {
+        if candidate.is_absolute()
+            && candidate.is_file()
+            && command(&candidate.to_string_lossy())
+                .arg("-version")
+                .output()
+                .is_ok_and(|output| output.status.success())
+        {
+            return Ok(candidate);
+        }
+    }
+    Err("FFmpeg를 실행할 수 없습니다. 무설치 ZIP 전체를 새 폴더에 풀어 주세요.".into())
+}
+
+#[tauri::command]
+async fn choose_folder(
+    window: tauri::WebviewWindow,
+    current: String,
+) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut dialog = rfd::FileDialog::new()
+            .set_parent(&window)
+            .set_title("MP4 저장 폴더 선택");
+        let path = Path::new(&current);
+        if path.is_absolute() {
+            if let Some(dir) = path.ancestors().find(|dir| dir.is_dir()) {
+                dialog = dialog.set_directory(dir);
+            }
+        }
+        dialog
+            .pick_folder()
+            .map(|folder| folder.to_string_lossy().into_owned())
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 fn post_url(input: &str) -> Result<String, String> {
@@ -154,7 +195,7 @@ fn stamp() -> Result<u128, String> {
         .map_err(|e| e.to_string())
 }
 
-fn engine(app: &AppHandle, job: &Job, project: &Project) -> Result<Command, String> {
+fn engine(app: &AppHandle, project: &Project) -> Result<Command, String> {
     let script = app
         .path()
         .resource_dir()
@@ -178,13 +219,13 @@ fn engine(app: &AppHandle, job: &Job, project: &Project) -> Result<Command, Stri
         ],
         "Node.js 22 이상",
     )?;
-    preflight(job.ffmpeg.trim(), &["-version"], "FFmpeg")?;
+    let ffmpeg = detect_ffmpeg()?;
     let mut worker = command(&node);
     worker
         .arg(script)
         .arg(&project.url)
         .env("SHORTS_SESSION", &project.dir)
-        .env("FFMPEG", job.ffmpeg.trim())
+        .env("FFMPEG", ffmpeg)
         .env("SHORTS_PLANNER", "deepseek")
         .env("SHORTS_VOICE", "gemini")
         .env_remove("SHORTS_TEMPLATE")
@@ -252,7 +293,7 @@ fn preview_project(app: &AppHandle, job: Job) -> Result<Preview, String> {
         if secret.is_empty() && !project.dir.join("plan.json").is_file() {
             return Err("대본 생성에 사용할 DeepSeek API 키를 입력하세요.".into());
         }
-        let mut worker = engine(app, &job, project)?;
+        let mut worker = engine(app, project)?;
         worker
             .arg("-")
             .env("SHORTS_ACTION", "prepare")
@@ -280,7 +321,7 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
     }
     let folder = PathBuf::from(job.output_folder.trim());
     if !folder.is_absolute() {
-        return Err("저장 폴더의 전체 경로를 입력하세요.".into());
+        return Err("MP4를 저장할 폴더를 선택하세요.".into());
     }
     fs::create_dir_all(&folder).map_err(|e| format!("저장 폴더를 열 수 없습니다. {e}"))?;
     let stamp = stamp()?;
@@ -300,7 +341,7 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
     drop(file_test);
     fs::remove_file(&probe).map_err(|e| format!("저장 폴더를 사용할 수 없습니다. {e}"))?;
 
-    let mut worker = engine(app, &job, project)?;
+    let mut worker = engine(app, project)?;
     worker
         .arg(&partial)
         .env("SHORTS_ACTION", "render")
@@ -370,6 +411,7 @@ fn main() {
         .manage(Studio::default())
         .invoke_handler(tauri::generate_handler![
             defaults,
+            choose_folder,
             prepare,
             generate,
             open_output

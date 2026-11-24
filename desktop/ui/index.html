@@ -4,13 +4,13 @@
   <div class="brand"><span class="logo" aria-hidden="true">▶</span>Blog Shorts</div>
   <fieldset id="inputs" disabled>
     <section id="entry">
-      <header class="hero"><div><h1>블로그로<br>숏츠 만들기</h1><p>내 글을 일곱 가지 스타일로 미리 보세요.</p></div>
+      <header class="hero"><h1>숏츠 만들기</h1>
         <div class="fan" aria-hidden="true"><i></i><i></i><i></i></div>
       </header>
       <div class="source"><label for="url">네이버 블로그 글 주소</label><div class="field">
         <input type="url" id="url" placeholder="https://blog.naver.com/아이디/글번호" spellcheck="false" required>
         <button id="confirm" type="button" class="primary confirm">확인</button></div>
-        <p class="input-note">처음 확인할 때 DeepSeek로 대본을 생성합니다. 스타일 비교는 무료입니다.</p>
+        <p class="input-note">새 글을 확인하면 대본 생성 요금이 발생합니다.</p>
       </div>
     </section>
     <div class="source-row" id="sourceRow" hidden><span class="naver" aria-hidden="true">N</span><strong id="article"></strong><button class="plain" id="edit" type="button">링크 변경</button></div>
@@ -19,19 +19,17 @@
       <div class="deck" id="deck" aria-label="좌우로 넘기는 첫 장면 미리보기"></div>
       <div class="tiles" id="gallery" role="group" aria-label="모든 스타일" hidden></div>
       <div class="controls" id="arrows"><button class="arrow" id="prev" type="button" aria-label="이전 스타일">‹</button><div class="which" role="status"><b id="styleName"></b><small id="count"></small></div><button class="arrow" id="next" type="button" aria-label="다음 스타일">›</button></div>
-      <div class="bottom"><small>첫 장면 미리보기 · 세로 9:16</small><button class="primary" id="create" type="button">이 스타일로 제작</button></div>
+      <div class="bottom"><button class="primary" id="create" type="button">이 스타일로 제작</button></div>
     </section>
     <section id="finished" hidden aria-label="완성된 영상"><div class="result-body">
       <video id="player" controls playsinline preload="metadata" aria-label="완성된 숏츠"></video>
-      <div><p class="result-meta">제작 완료 · MP4</p><h2 id="doneStyle"></h2><p id="file"></p>
+      <div><h2>저장 완료</h2><p id="file"></p>
         <button id="open" type="button">저장 폴더 열기</button><button id="again" type="button">스타일 다시 고르기</button></div>
     </div></section>
-    <details id="settings"><summary>API 키 및 저장 설정</summary><div class="options">
-      <label for="key">DeepSeek API 키 <small>글 확인 · 대본 생성</small></label><input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="API 키 입력">
-      <label for="geminiKey">Gemini API 키 <small>제작 · Leda 쇼호스트 내레이션</small></label><input type="password" id="geminiKey" autocomplete="off" spellcheck="false" placeholder="API 키 입력">
-      <small class="wide">키는 앱을 닫으면 지워집니다. 대본과 음성 요금은 각 서비스의 사용량을 따릅니다.</small>
-      <label for="folder">MP4 저장 폴더</label><input id="folder" spellcheck="false">
-      <label for="ffmpeg">FFmpeg 실행 경로</label><input id="ffmpeg" spellcheck="false">
+    <details id="settings"><summary>API 키 및 저장 폴더</summary><div class="options">
+      <label for="key">DeepSeek API 키</label><input type="password" id="key" autocomplete="off" spellcheck="false">
+      <label for="geminiKey">Gemini API 키</label><input type="password" id="geminiKey" autocomplete="off" spellcheck="false">
+      <label for="folder">MP4 저장 폴더</label><div class="field folder-field"><input id="folder" spellcheck="false"><button id="chooseFolder" type="button">폴더 선택</button></div>
     </div></details>
   </fieldset>
   <section id="result" role="status" aria-live="polite" hidden><strong id="state"></strong><p id="message"></p></section>

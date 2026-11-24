@@ -1,10 +1,31 @@
 # 블로그 쇼츠
 
-공개 네이버 블로그 글 한 편을 한국어 음성, 자막, 원문 사진으로 구성한 세로 MP4로 만듭니다. 글과 사진을 받는 단계만 인터넷을 사용합니다. API 키나 유료 모델은 필요 없습니다.
+공개 네이버 블로그 글 한 편을 한국어 음성, 자막, 원문 사진으로 구성한 세로 MP4로 만듭니다. 사진은 장면마다 한 번 잘라 고정합니다. 모델과 실행 패키지 설치 후에는 글과 사진을 받는 단계만 인터넷을 사용합니다.
 
 ## 준비
 
-Windows 64비트, Node.js 22, Windows PowerShell 5.1, 데스크톱 한국어 합성 음성, FFmpeg가 필요합니다. 이 PC에서는 Microsoft Heami 음성으로 확인했습니다. FFmpeg는 libass, libx264, AAC를 지원하는 빌드를 사용하세요. ffmpeg.exe가 PATH에 없으면 PowerShell에서 `$env:FFMPEG = 'C:\도구\ffmpeg.exe'`로 위치를 지정하세요.
+Windows 64비트, Node.js 22, FFmpeg가 필요합니다. FFmpeg는 libass, libx264, AAC를 지원하는 빌드를 사용하세요. ffmpeg.exe가 PATH에 없으면 PowerShell에서 `$env:FFMPEG = 'C:\도구\ffmpeg.exe'`로 위치를 지정하세요.
+
+### 무료 로컬 AI 음성
+
+Python 3.12가 설치된 PC에서 아래 명령을 레포 폴더에서 실행하세요. 모델과 라이브러리는 처음 한 번 받습니다.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install sherpa-onnx==2.0.3 numpy
+curl.exe -fL https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2 -o supertonic.tar.bz2
+tar -xf supertonic.tar.bz2
+```
+
+PowerShell을 새로 열 때는 레포 폴더에서 다음 설정을 적용하고 아래 사용 예시를 실행하세요.
+
+```powershell
+$env:SHORTS_PYTHON = (Resolve-Path .venv/Scripts/python.exe).Path
+$env:SUPERTONIC_MODEL = (Resolve-Path sherpa-onnx-supertonic-3-tts-int8-2026-05-11).Path
+$env:SHORTS_SPEAKER = '2'
+```
+
+화자 번호는 0~9입니다. SUPERTONIC_MODEL을 설정하면 한국어 Supertonic 3를 CPU에서 실행합니다. 해당 변수를 생략하면 Windows PowerShell 5.1과 설치된 한국어 데스크톱 음성을 사용합니다. [한국어 음성 샘플](https://k2-fsa.github.io/sherpa/onnx/tts/all/Korean/supertonic-3-ko.html) · [모델 카드](https://huggingface.co/Supertone/supertonic-3)
 
 ## 사용
 

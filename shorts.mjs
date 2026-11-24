@@ -53,7 +53,14 @@ if (!plan.scenes?.length || !plan.title || plan.scenes.some(s=>!photos[s.photo-1
   throw Error('Invalid title, photo number or narration.');
 console.log('Photos:',photos.length,'Scenes:',plan.scenes.length,'Working files:',dir);
 writeFileSync(local('scenes.json'),JSON.stringify(plan.scenes,null,2));
-run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',fileURLToPath(new URL('voice.ps1',import.meta.url)),local('scenes.json'),dir]);
+if (process.env.SUPERTONIC_MODEL) {
+  run(process.env.SHORTS_PYTHON || 'python', [
+    fileURLToPath(new URL('voice_ai.py',import.meta.url)),local('scenes.json'),dir,
+    path.resolve(process.env.SUPERTONIC_MODEL)
+  ]);
+} else {
+  run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',fileURLToPath(new URL('voice.ps1',import.meta.url)),local('scenes.json'),dir]);
+}
 
 function wrap(line,limit) {
   const words = line.split(/\s+/).flatMap(w=>w.match(new RegExp('.{1,'+limit+'}','gu')) || []);
@@ -95,7 +102,7 @@ for (const [i,scene] of plan.scenes.entries()) {
     elapsed=until;
   }
   writeFileSync(local('scene.ass'),ass);
-  const vf="scale=900:1280:force_original_aspect_ratio=increase,crop=900:1280,zoompan=z='1+0.045*on/"+frames+"':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d="+frames+":s=720x1024:fps=30,pad=720:1280:0:256:color=0x302119,setsar=1,ass=scene.ass";
+  const vf="scale=720:1024:force_original_aspect_ratio=increase,crop=720:1024,setsar=1,pad=720:1280:0:256:color=0x302119,loop=loop=-1:size=1:start=0,settb=1/30,setpts=N,fps=30,ass=scene.ass";
   run(ffmpeg,['-loglevel','error','-y','-i','photo','-i',i+'.wav','-vf',vf,'-af','apad','-t',String(end),'-c:v','libx264','-preset','veryfast','-crf','19','-pix_fmt','yuv420p','-c:a','aac','-ar','48000',i+'.mp4']);
 }
 writeFileSync(local('list.txt'),plan.scenes.map((_,i)=>"file '"+i+".mp4'").join('\n'));

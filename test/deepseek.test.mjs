@@ -7,7 +7,7 @@ import {createDeepSeekPlan} from '../deepseek-planner.mjs';
 import {synthesizeDeepSeekScenes} from '../deepseek-voice.mjs';
 
 const photo = {lines:['따끈한 빵에 고기를 올려 먹어요.']};
-const scene = {photo:1, text:'빵과 고기를 함께 먹어요.', caption:'따끈한 빵과 고기', evidence:'빵에 고기를'};
+const scene = {photo:1, text:'빵과 고기를 함께 먹어요.', evidence:'빵에 고기를'};
 
 test('장면 번호와 본문 인용이 일치하는 대본만 사용한다', async () => {
   function planFor(editedScene) {
@@ -18,6 +18,7 @@ test('장면 번호와 본문 인용이 일치하는 대본만 사용한다', as
     return createDeepSeekPlan('바비큐', '', [photo], {apiKey:'test', request});
   }
   assert.deepEqual((await planFor(scene)).scenes[0], scene);
+  assert.deepEqual((await planFor({...scene, caption:'예전 요약 자막'})).scenes[0], scene);
   await assert.rejects(planFor({...scene, photo:2}), /사진 번호/);
   await assert.rejects(planFor({...scene, evidence:'빠른 예약 필수'}), /근거/);
 });

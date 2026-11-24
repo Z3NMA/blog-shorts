@@ -5,8 +5,8 @@ const editorPrompt = `당신은 네이버 블로그 글을 한국어 세로 영�
 제목은 2줄 이내, 한 줄은 공백 포함 15자 이내로 작성하세요. 풍부한 글이라면 7~10개 장면, 약 45~55초를 목표로 하고, 정보가 적으면 짧게 끝내세요.
 첫 장면은 글에서 가장 구체적이고 매력적인 내용으로 시작하세요. 도입 인사를 생략하고, 정보와 장면의 순서를 이야기 흐름에 맞게 바꾸세요.
 사진의 before 또는 after에서 짧고 정확한 연속 인용을 evidence에 복사하세요. 사진에서 직접 봤다고 지어내지 마세요. 가격·주소·운영시간·후기는 입력에 있는 사실만 쓰세요.
-text는 한국어로 소리 내어 읽기 편한 구어체 대사 한두 문장, caption은 그 대사의 핵심을 담은 최대 30자의 한국어 자막입니다. 사진을 반복하지 마세요.
-json 형식 예시: {"title":"첫 번째 줄\\n두 번째 줄","scenes":[{"photo":3,"text":"이곳의 대표 메뉴는 잭 플래터예요.","caption":"대표 메뉴, 잭 플래터","evidence":"대표 메뉴는 잭 플래터"}]}
+text는 내레이션과 자막에 똑같이 사용합니다. 한 호흡에 읽히는 짧은 구어체 문장을 쓰고 문장부호로 호흡을 표시하세요. 사진을 반복하지 마세요.
+json 형식 예시: {"title":"첫 번째 줄\\n두 번째 줄","scenes":[{"photo":3,"text":"이곳의 대표 메뉴는 잭 플래터예요.","evidence":"대표 메뉴는 잭 플래터"}]}
 예시의 장소·메뉴는 실제 원문에 있을 때만 사용하세요.`;
 
 function collectSource(title, intro, photos) {
@@ -44,7 +44,7 @@ function checkPlan(plan, source) {
       throw Error('사진 ' + candidate.photo + '의 근거 문구를 원문에서 찾을 수 없습니다.');
     return {
       photo:candidate.photo, text:checkedText(scene.text, 180, '대사'),
-      caption:checkedText(scene.caption, 30, '자막'), evidence
+      evidence
     };
   });
   return {title, scenes};

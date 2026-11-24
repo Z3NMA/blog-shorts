@@ -66,6 +66,8 @@ if (scriptFile) {
 }
 if (!plan.scenes?.length || !plan.title || plan.scenes.some(s=>!photos[s.photo-1] || !s.text?.trim()))
   throw Error('Invalid title, photo number or narration.');
+// Older saved plans can include a separately summarized subtitle.
+for (const scene of plan.scenes) delete scene.caption;
 console.log('Photos:',photos.length,'Scenes:',plan.scenes.length,'Working files:',dir);
 writeFileSync(local('plan.json'),JSON.stringify(plan,null,2));
 if (process.env.SHORTS_PLAN_PATH) {
@@ -94,7 +96,10 @@ function wrap(line,limit) {
   }
   return rows;
 }
-function assText(s) { return s.replace(/[{}\\]/g,''); }
+function assText(s) {
+  // Break literal ASS escape sequences without changing the visible dialogue.
+  return s.replaceAll('\\', '\\\u2060').replace(/[{}]/g, char => '\\' + char);
+}
 function stamp(sec) {
   const cs=Math.floor(sec*100);
   return '0:'+String(Math.floor(cs/6000)).padStart(2,'0')+':'+String(Math.floor(cs/100)%60).padStart(2,'0')+'.'+String(cs%100).padStart(2,'0');
@@ -114,7 +119,7 @@ for (const [i,scene] of plan.scenes.entries()) {
   const headings=plan.title.split('\n').flatMap(line=>wrap(assText(line),15));
   const heading=headings.map((row,k)=>(k?'\\N{\\c&H41BDFF&}':'')+row).join('');
   let ass=assHeader+event(0,end,'{\\pos(360,130)\\fs62}'+heading);
-  const rows=wrap(assText(scene.caption || scene.text),15);
+  const rows=wrap(scene.text,15).map(assText);
   const groups=[];
   for(let j=0;j<rows.length;j+=2) groups.push(rows.slice(j,j+2));
   const weight=groups.map(g=>g.join('').length);

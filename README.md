@@ -4,9 +4,9 @@
 
 ## 데스크톱 앱
 
-Windows 10/11 64비트 사용자는 [Releases](https://github.com/Z3NMA/blog-shorts/releases)에서 `Blog-Shorts-Setup-x64.exe`를 받아 설치한 뒤 시작 메뉴에서 **Blog Shorts**를 실행하세요. 설치본에 Node.js와 FFmpeg가 들어 있습니다. DeepSeek 음성은 본인의 API 키와 사용 가능 잔액이 필요합니다. Supertonic으로 새 음성을 합성할 때는 아래의 모델 설치 단계를 따르세요. 제천 비교 화면의 기존 Supertonic 샘플은 바로 재생됩니다.
+Windows 10/11 64비트 사용자는 [Releases](https://github.com/Z3NMA/blog-shorts/releases)에서 최신 포터블 ZIP을 받아 전체 압축을 풀고 **blog-shorts.exe**를 실행하세요. 포터블 버전에 Node.js와 FFmpeg가 들어 있습니다. DeepSeek 음성은 본인의 API 키와 사용 가능 잔액이 필요합니다. Supertonic으로 새 음성을 합성할 때는 아래의 모델 설치 단계를 따르세요. 제천 비교 화면의 기존 Supertonic 샘플은 바로 재생됩니다.
 
-Windows용 Tauri 앱에서 블로그 주소와 DeepSeek API 키를 입력하고 음성을 선택합니다. Rust가 로컬 렌더러를 실행합니다. DeepSeek Flash에는 글 제목, 사진 번호와 주변 문장을 보내 제목·사진 순서·대사·자막을 한 번에 요청합니다. 앱에서 영상을 만들 때 ChatGPT나 Codex 호출은 발생하지 않습니다.
+Windows용 Tauri 앱에서 블로그 주소와 DeepSeek API 키를 입력하고 음성을 선택합니다. Rust가 로컬 렌더러를 실행합니다. DeepSeek Flash에는 글 제목, 사진 번호와 주변 문장을 보내 제목·사진 순서·대사를 한 번에 요청합니다. v0.2.1부터 음성 합성에 보낸 대사를 화면에도 그대로 표시합니다. 긴 대사는 최대 두 줄씩 나누어 보여줍니다. 앱에서 영상을 만들 때 ChatGPT나 Codex 호출은 발생하지 않습니다.
 
 음성까지 DeepSeek로 만들면 각 장면의 대사를 음성 API에 보냅니다. Stella와 Tide 중에서 선택할 수 있습니다. 무료 음성은 로컬 Supertonic 3 또는 Windows 한국어 음성을 사용합니다. MP4 합성은 모든 모드에서 로컬 FFmpeg가 수행합니다.
 

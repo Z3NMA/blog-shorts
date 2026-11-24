@@ -42,6 +42,7 @@ test('Gemini sends the exact caption text per scene and saves Google WAV output'
     },
   });
   assert.deepEqual(sent, scenes.map(s => s.text));
+  await synthesizeGeminiScenes(scenes, dir, {apiKey:'', reuseCompleted:true, request:assert.fail});
   for (const i of scenes.keys()) assert.deepEqual(await readFile(path.join(dir, i + '.wav')), wav);
 });
 

@@ -1,57 +1,38 @@
 <!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <title>Blog Shorts</title>
-  <link rel="stylesheet" href="studio.css">
-  <script type="module" src="studio.js"></script>
-</head>
-<body>
-  <main>
-    <header>
-      <div class="brand"><span class="mark" aria-hidden="true"><i></i></span>Blog Shorts</div>
-      <h1>새 숏츠 만들기</h1>
-      <p>블로그 글의 사진과 대사로 내레이션과 자막이 담긴 세로 영상을 만드세요.</p>
-    </header>
-    <form id="form">
-      <fieldset id="inputs" disabled>
-        <section class="group" aria-labelledby="post-heading">
-          <h2 id="post-heading">원본 글</h2>
-          <div class="card post">
-            <label for="url">네이버 블로그 글 주소</label>
-            <div class="url-field">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13.8 4-4M8.2 15.8l-1 1a3.5 3.5 0 0 1-5-5l4-4a3.5 3.5 0 0 1 5 0m1.6 8.4a3.5 3.5 0 0 0 5 0l4-4a3.5 3.5 0 0 0-5-5l-1 1"/></svg>
-              <input id="url" type="url" placeholder="https://blog.naver.com/아이디/글번호" spellcheck="false" required>
-            </div>
-          </div>
-        </section>
-        <section class="group" aria-labelledby="audio-heading">
-          <h2 id="audio-heading">대본과 내레이션</h2>
-          <div class="card">
-            <div class="row"><div><strong>내레이션</strong><small>조금 높은 톤의 발랄한 여성 쇼호스트</small></div>
-              <span>Gemini 3.8 Flash TTS</span>
-            </div>
-            <div class="row"><div><label for="key">DeepSeek API 키</label><small id="key-hint">대본과 장면 구성에 사용합니다.</small></div>
-              <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="API 키 입력" aria-describedby="key-hint"></div>
-            <div class="row" id="gemini-credentials"><div><label for="geminiKey">Gemini API 키</label><small>Google AI Studio에서 발급한 키</small></div>
-              <input id="geminiKey" type="password" autocomplete="off" spellcheck="false" placeholder="API 키 입력"></div>
-          </div>
-          <p class="footnote">대본은 DeepSeek, 음성은 Google 사용량에 따라 과금됩니다. 입력한 키는 앱을 닫으면 지워집니다.</p>
-        </section>
-        <details class="card" id="settings">
-          <summary>저장 위치와 실행 설정</summary>
-          <div class="row"><label for="folder">MP4 저장 폴더</label><input id="folder" required spellcheck="false"></div>
-          <div class="row"><label for="ffmpeg">FFmpeg 실행 경로</label><input id="ffmpeg" required spellcheck="false"></div>
-        </details>
-        <div class="actions"><span>세로 9:16 <b>·</b> MP4</span><button id="create" type="submit">숏츠 만들기</button></div>
-      </fieldset>
-    </form>
-    <section class="card result" id="result" role="status" aria-live="polite" hidden>
-      <h2 id="state"></h2><p id="message"></p>
-      <button type="button" id="open" hidden>저장 폴더 열기</button>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Blog Shorts</title><link rel="stylesheet" href="studio.css"><script type="module" src="studio.js"></script></head>
+<body><main class="app">
+  <div class="brand"><span class="logo" aria-hidden="true">▶</span>Blog Shorts</div>
+  <fieldset id="inputs" disabled>
+    <section id="entry">
+      <header class="hero"><div><h1>블로그로<br>숏츠 만들기</h1><p>내 글을 일곱 가지 스타일로 미리 보세요.</p></div>
+        <div class="fan" aria-hidden="true"><i></i><i></i><i></i></div>
+      </header>
+      <div class="source"><label for="url">네이버 블로그 글 주소</label><div class="field">
+        <input type="url" id="url" placeholder="https://blog.naver.com/아이디/글번호" spellcheck="false" required>
+        <button id="confirm" type="button" class="primary confirm">확인</button></div>
+        <p class="input-note">처음 확인할 때 DeepSeek로 대본을 생성합니다. 스타일 비교는 무료입니다.</p>
+      </div>
     </section>
-  </main>
-</body>
-</html>
+    <div class="source-row" id="sourceRow" hidden><span class="naver" aria-hidden="true">N</span><strong id="article"></strong><button class="plain" id="edit" type="button">링크 변경</button></div>
+    <section id="picker" hidden aria-label="영상 스타일 선택">
+      <div class="section-head"><h2>영상 스타일</h2><button class="mode" id="mode" type="button" aria-controls="gallery" aria-expanded="false"><span aria-hidden="true">▦</span><span id="modeName">모두 보기</span></button></div>
+      <div class="deck" id="deck" aria-label="좌우로 넘기는 첫 장면 미리보기"></div>
+      <div class="tiles" id="gallery" role="group" aria-label="모든 스타일" hidden></div>
+      <div class="controls" id="arrows"><button class="arrow" id="prev" type="button" aria-label="이전 스타일">‹</button><div class="which" role="status"><b id="styleName"></b><small id="count"></small></div><button class="arrow" id="next" type="button" aria-label="다음 스타일">›</button></div>
+      <div class="bottom"><small>첫 장면 미리보기 · 세로 9:16</small><button class="primary" id="create" type="button">이 스타일로 제작</button></div>
+    </section>
+    <section id="finished" hidden aria-label="완성된 영상"><div class="result-body">
+      <video id="player" controls playsinline preload="metadata" aria-label="완성된 숏츠"></video>
+      <div><p class="result-meta">제작 완료 · MP4</p><h2 id="doneStyle"></h2><p id="file"></p>
+        <button id="open" type="button">저장 폴더 열기</button><button id="again" type="button">스타일 다시 고르기</button></div>
+    </div></section>
+    <details id="settings"><summary>API 키 및 저장 설정</summary><div class="options">
+      <label for="key">DeepSeek API 키 <small>글 확인 · 대본 생성</small></label><input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="API 키 입력">
+      <label for="geminiKey">Gemini API 키 <small>제작 · Leda 쇼호스트 내레이션</small></label><input type="password" id="geminiKey" autocomplete="off" spellcheck="false" placeholder="API 키 입력">
+      <small class="wide">키는 앱을 닫으면 지워집니다. 대본과 음성 요금은 각 서비스의 사용량을 따릅니다.</small>
+      <label for="folder">MP4 저장 폴더</label><input id="folder" spellcheck="false">
+      <label for="ffmpeg">FFmpeg 실행 경로</label><input id="ffmpeg" spellcheck="false">
+    </div></details>
+  </fieldset>
+  <section id="result" role="status" aria-live="polite" hidden><strong id="state"></strong><p id="message"></p></section>
+</main></body></html>

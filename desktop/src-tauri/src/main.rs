@@ -17,7 +17,28 @@ use tauri::{AppHandle, Emitter, Manager};
 #[derive(Default)]
 struct Studio {
     busy: AtomicBool,
+    project: Mutex<Option<Project>>,
     last_file: Mutex<Option<PathBuf>>,
+}
+
+struct Project {
+    url: String,
+    token: String,
+    dir: PathBuf,
+}
+
+impl Drop for Project {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.dir);
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Preview {
+    token: String,
+    manifest: String,
+    audio_ready: bool,
 }
 
 #[derive(Deserialize)]
@@ -27,6 +48,10 @@ struct Job {
     api_key: String,
     #[serde(default)]
     gemini_key: String,
+    #[serde(default)]
+    token: String,
+    #[serde(default)]
+    template: String,
     output_folder: String,
     ffmpeg: String,
 }
@@ -76,7 +101,9 @@ fn command(executable: &str) -> Command {
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000);
     }
-    cmd.env_remove("DEEPSEEK_API_KEY").env_remove("GEMINI_API_KEY").stdin(Stdio::null());
+    cmd.env_remove("DEEPSEEK_API_KEY")
+        .env_remove("GEMINI_API_KEY")
+        .stdin(Stdio::null());
     cmd
 }
 
@@ -91,55 +118,43 @@ fn preflight(executable: &str, args: &[&str], name: &str) -> Result<(), String> 
     Ok(())
 }
 
-fn render(app: &AppHandle, job: Job) -> Result<String, String> {
-    let url =
-        tauri::Url::parse(job.url.trim()).map_err(|_| "네이버 블로그 글 주소를 입력하세요.")?;
-    if url.scheme() != "https"
-        || !matches!(url.host_str(), Some("blog.naver.com" | "m.blog.naver.com"))
+fn post_url(input: &str) -> Result<String, String> {
+    let u = tauri::Url::parse(input.trim()).map_err(|_| "네이버 블로그 글 주소를 입력하세요.")?;
+    let parts: Vec<_> = u.path().trim_matches('/').split('/').collect();
+    if u.scheme() != "https"
+        || !matches!(u.host_str(), Some("blog.naver.com" | "m.blog.naver.com"))
+        || u.port().is_some()
+        || !u.username().is_empty()
+        || u.password().is_some()
+        || parts.len() != 2
+        || parts[0].is_empty()
+        || parts[1].is_empty()
+        || !parts[0]
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        || !parts[1].bytes().all(|b| b.is_ascii_digit())
     {
-        return Err("https://blog.naver.com 또는 모바일 글 주소를 입력하세요.".into());
+        return Err("아이디와 글 번호가 있는 네이버 블로그 주소를 입력하세요.".into());
     }
-    let key = if job.api_key.trim().is_empty() {
-        env::var("DEEPSEEK_API_KEY").unwrap_or_default()
-    } else {
-        job.api_key.trim().to_owned()
-    };
-    if key.trim().is_empty() {
-        return Err("DeepSeek API 키를 입력하세요.".into());
-    }
-    let gemini_key = if job.gemini_key.trim().is_empty() {
-        env::var("GEMINI_API_KEY").unwrap_or_default()
-    } else {
-        job.gemini_key.trim().to_owned()
-    };
-    if gemini_key.trim().is_empty() {
-        return Err("Google AI Studio에서 발급한 Gemini API 키를 입력하세요.".into());
-    }
-    let folder = PathBuf::from(job.output_folder.trim());
-    if !folder.is_absolute() {
-        return Err("저장 폴더의 전체 경로를 입력하세요.".into());
-    }
-    fs::create_dir_all(&folder).map_err(|e| format!("저장 폴더를 열 수 없습니다. {e}"))?;
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
-        .as_millis();
-    let stem = format!("blog-shorts-{stamp}-{}", std::process::id());
-    let file = folder.join(format!("{stem}.mp4"));
-    let partial = folder.join(format!("{stem}.partial.mp4"));
-    let plan = folder.join(format!("{stem}.plan.json"));
-    if partial.exists() || file.exists() || plan.exists() {
-        return Err("파일 이름이 겹쳤습니다. 다시 실행하세요.".into());
-    }
-    let probe = folder.join(format!(".{stem}.write-test"));
-    let file_test = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&probe)
-        .map_err(|e| format!("저장 폴더에 쓸 수 없습니다. 다른 폴더를 선택하세요. {e}"))?;
-    drop(file_test);
-    fs::remove_file(&probe).map_err(|e| format!("저장 폴더를 사용할 수 없습니다. {e}"))?;
+    Ok(format!("https://blog.naver.com/{}/{}", parts[0], parts[1]))
+}
 
+fn key(value: &str, variable: &str) -> String {
+    if value.trim().is_empty() {
+        env::var(variable).unwrap_or_default().trim().to_owned()
+    } else {
+        value.trim().to_owned()
+    }
+}
+
+fn stamp() -> Result<u128, String> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .map_err(|e| e.to_string())
+}
+
+fn engine(app: &AppHandle, job: &Job, project: &Project) -> Result<Command, String> {
     let script = app
         .path()
         .resource_dir()
@@ -167,18 +182,20 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
     let mut worker = command(&node);
     worker
         .arg(script)
-        .arg(url.as_str())
-        .arg(&partial)
-        .env("SHORTS_PLANNER", "deepseek")
-        .env("SHORTS_PLAN_PATH", plan)
+        .arg(&project.url)
+        .env("SHORTS_SESSION", &project.dir)
         .env("FFMPEG", job.ffmpeg.trim())
-        .env_remove("SUPERTONIC_MODEL")
+        .env("SHORTS_PLANNER", "deepseek")
         .env("SHORTS_VOICE", "gemini")
-        .env("GEMINI_API_KEY", gemini_key.trim())
+        .env_remove("SHORTS_TEMPLATE")
+        .env_remove("SHORTS_PLAN_PATH")
         .env_remove("POST_HTML")
         .env_remove("PHOTO_DIR");
+    Ok(worker)
+}
+
+fn execute(app: &AppHandle, worker: &mut Command, secret: &str) -> Result<(), String> {
     let mut child = worker
-        .env("DEEPSEEK_API_KEY", &key)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -191,11 +208,11 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
     let progress = std::thread::spawn(move || {
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
             if line.starts_with("Photos:") {
-                let _ = handle.emit(
-                    "render-progress",
-                    "장면 구성이 끝났습니다. 음성과 영상을 제작하고 있습니다.",
-                );
-            } else if line.starts_with("Gemini 음성 · ") || line.starts_with("영상 합성 · ") {
+                let _ = handle.emit("render-progress", "대본과 장면 구성을 확인했습니다.");
+            } else if line.starts_with("Gemini 음성 · ")
+                || line.starts_with("영상 합성 · ")
+                || line.starts_with("미리보기 · ")
+            {
                 let _ = handle.emit("render-progress", line);
             }
         }
@@ -205,21 +222,102 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
         .map_err(|e| format!("렌더링 상태 확인 실패. {e}"))?;
     let _ = progress.join();
     if !result.status.success() {
-        let _ = fs::remove_file(&partial);
-        let mut stderr = String::from_utf8_lossy(&result.stderr).replace(&key, "[비공개]");
-        if !gemini_key.trim().is_empty() {
-            stderr = stderr.replace(gemini_key.trim(), "[비공개]");
+        let mut stderr = String::from_utf8_lossy(&result.stderr).into_owned();
+        if !secret.is_empty() {
+            stderr = stderr.replace(secret, "[비공개]");
         }
         let message = stderr
             .lines()
             .find(|s| s.starts_with("Error:"))
-            .unwrap_or_else(|| stderr.trim());
+            .unwrap_or(stderr.trim());
         return Err(message.chars().take(850).collect());
+    }
+    Ok(())
+}
+
+fn preview_project(app: &AppHandle, job: Job) -> Result<Preview, String> {
+    let url = post_url(&job.url)?;
+    let state = app.state::<Studio>();
+    let mut slot = state.project.lock().map_err(|e| e.to_string())?;
+    if slot.as_ref().map(|p| &p.url) != Some(&url) {
+        let token = format!("{}-{}", std::process::id(), stamp()?);
+        let dir = env::temp_dir().join(format!("blog-shorts-studio-{token}"));
+        fs::create_dir(&dir).map_err(|e| format!("임시 작업 폴더를 만들지 못했습니다. {e}"))?;
+        *slot = Some(Project { url, token, dir });
+    }
+    let project = slot.as_ref().ok_or("글을 다시 확인하세요.")?;
+    let manifest = project.dir.join("preview.json");
+    if !manifest.is_file() {
+        let secret = key(&job.api_key, "DEEPSEEK_API_KEY");
+        if secret.is_empty() && !project.dir.join("plan.json").is_file() {
+            return Err("대본 생성에 사용할 DeepSeek API 키를 입력하세요.".into());
+        }
+        let mut worker = engine(app, &job, project)?;
+        worker
+            .arg("-")
+            .env("SHORTS_ACTION", "prepare")
+            .env("DEEPSEEK_API_KEY", &secret);
+        execute(app, &mut worker, &secret)?;
+    }
+    Ok(Preview {
+        audio_ready: project.dir.join("voice.ready").is_file(),
+        token: project.token.clone(),
+        manifest: fs::read_to_string(manifest).map_err(|e| e.to_string())?,
+    })
+}
+
+fn render(app: &AppHandle, job: Job) -> Result<String, String> {
+    let url = post_url(&job.url)?;
+    let state = app.state::<Studio>();
+    let slot = state.project.lock().map_err(|e| e.to_string())?;
+    let project = slot
+        .as_ref()
+        .filter(|p| p.token == job.token && p.url == url && p.dir.join("preview.json").is_file())
+        .ok_or("현재 글의 미리보기를 다시 확인하세요.")?;
+    let secret = key(&job.gemini_key, "GEMINI_API_KEY");
+    if secret.is_empty() && !project.dir.join("voice.ready").is_file() {
+        return Err("Gemini API 키를 입력하세요.".into());
+    }
+    let folder = PathBuf::from(job.output_folder.trim());
+    if !folder.is_absolute() {
+        return Err("저장 폴더의 전체 경로를 입력하세요.".into());
+    }
+    fs::create_dir_all(&folder).map_err(|e| format!("저장 폴더를 열 수 없습니다. {e}"))?;
+    let stamp = stamp()?;
+    let stem = format!("blog-shorts-{stamp}-{}", std::process::id());
+    let file = folder.join(format!("{stem}.mp4"));
+    let partial = folder.join(format!("{stem}.partial.mp4"));
+    let plan = folder.join(format!("{stem}.plan.json"));
+    if partial.exists() || file.exists() || plan.exists() {
+        return Err("파일 이름이 겹쳤습니다. 다시 실행하세요.".into());
+    }
+    let probe = folder.join(format!(".{stem}.write-test"));
+    let file_test = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe)
+        .map_err(|e| format!("저장 폴더에 쓸 수 없습니다. 다른 폴더를 선택하세요. {e}"))?;
+    drop(file_test);
+    fs::remove_file(&probe).map_err(|e| format!("저장 폴더를 사용할 수 없습니다. {e}"))?;
+
+    let mut worker = engine(app, &job, project)?;
+    worker
+        .arg(&partial)
+        .env("SHORTS_ACTION", "render")
+        .env("SHORTS_PLAN_PATH", plan)
+        .env("SHORTS_TEMPLATE", &job.template)
+        .env("GEMINI_API_KEY", &secret);
+    if let Err(error) = execute(app, &mut worker, &secret) {
+        let _ = fs::remove_file(&partial);
+        return Err(error);
     }
     if fs::metadata(&partial).map(|m| m.len()).unwrap_or(0) == 0 {
         return Err("결과 MP4를 확인할 수 없습니다.".into());
     }
     fs::rename(&partial, &file).map_err(|e| format!("완성 파일을 저장할 수 없습니다. {e}"))?;
+    app.asset_protocol_scope()
+        .allow_file(&file)
+        .map_err(|e| e.to_string())?;
     *app.state::<Studio>()
         .last_file
         .lock()
@@ -227,15 +325,28 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
     Ok(file.to_string_lossy().into_owned())
 }
 
-#[tauri::command]
-async fn generate(app: AppHandle, job: Job) -> Result<String, String> {
+async fn run_task<T: Send + 'static>(
+    app: AppHandle,
+    job: Job,
+    task: fn(&AppHandle, Job) -> Result<T, String>,
+) -> Result<T, String> {
     if app.state::<Studio>().busy.swap(true, Ordering::AcqRel) {
-        return Err("이미 제작 중인 영상이 있습니다.".into());
+        return Err("이미 진행 중인 작업이 있습니다.".into());
     }
     let handle = app.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || render(&handle, job)).await;
+    let result = tauri::async_runtime::spawn_blocking(move || task(&handle, job)).await;
     app.state::<Studio>().busy.store(false, Ordering::Release);
     result.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn prepare(app: AppHandle, job: Job) -> Result<Preview, String> {
+    run_task(app, job, preview_project).await
+}
+
+#[tauri::command]
+async fn generate(app: AppHandle, job: Job) -> Result<String, String> {
+    run_task(app, job, render).await
 }
 
 #[tauri::command]
@@ -257,7 +368,19 @@ fn open_output(app: AppHandle) -> Result<(), String> {
 fn main() {
     tauri::Builder::default()
         .manage(Studio::default())
-        .invoke_handler(tauri::generate_handler![defaults, generate, open_output])
-        .run(tauri::generate_context!())
-        .expect("Blog Shorts startup failed");
+        .invoke_handler(tauri::generate_handler![
+            defaults,
+            prepare,
+            generate,
+            open_output
+        ])
+        .build(tauri::generate_context!())
+        .expect("Blog Shorts startup failed")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                if let Ok(mut slot) = app.state::<Studio>().project.try_lock() {
+                    slot.take();
+                }
+            }
+        });
 }

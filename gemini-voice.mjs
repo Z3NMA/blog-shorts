@@ -1,4 +1,4 @@
-import {writeFile} from 'node:fs/promises';
+import {writeFile, rename, stat} from 'node:fs/promises';
 import path from 'node:path';
 
 const showHostVoice = 'Leda';
@@ -7,9 +7,15 @@ const showHostStyle = 'An adult female Korean home-shopping presenter with a sli
 export async function synthesizeGeminiScenes(scenes, directory, {
   apiKey = process.env.GEMINI_API_KEY,
   request = fetch,
+  reuseCompleted = false,
 } = {}) {
-  if (!apiKey?.trim()) throw Error('Google AI Studio에서 발급한 Gemini API 키를 입력하세요.');
   for (const [index, scene] of scenes.entries()) {
+    const file = path.join(directory, index + '.wav');
+    if (reuseCompleted && await stat(file).then(info => info.size > 44, error => {
+      if (error.code === 'ENOENT') return false;
+      throw error;
+    })) continue;
+    if (!apiKey?.trim()) throw Error('Google AI Studio에서 발급한 Gemini API 키를 입력하세요.');
     const label = `Gemini 음성 · ${index + 1}/${scenes.length}장면`;
     console.log(label);
     const response = await request('https://generativelanguage.googleapis.com/v1beta/interactions', {
@@ -44,6 +50,7 @@ export async function synthesizeGeminiScenes(scenes, directory, {
     if (wav.length <= 44 || wav.toString('ascii', 0, 4) !== 'RIFF' || wav.toString('ascii', 8, 12) !== 'WAVE') {
       throw Error(`${label}의 WAV 음성을 받지 못했습니다.`);
     }
-    await writeFile(path.join(directory, `${index}.wav`), wav);
+    await writeFile(file + '.tmp', wav);
+    await rename(file + '.tmp', file);
   }
 }

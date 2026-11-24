@@ -10,7 +10,9 @@ Windows용 Tauri 앱에서 블로그 주소와 DeepSeek·Gemini API 키를 입�
 
 앱 내 내레이션은 Gemini 3.8 Flash TTS의 Leda로 고정됩니다. 조금 높은 피치의 밝고 귀여운 여성 쇼호스트처럼 읽도록 모든 장면에 같은 말투 지시를 보냅니다. 자막과 음성에는 같은 대사를 사용합니다. CLI에서도 `SHORTS_VOICE=gemini`와 `GEMINI_API_KEY`를 설정하면 같은 내레이션을 렌더링합니다. [Google 음성 생성 문서](https://ai.google.dev/gemini-api/docs/speech-generation)
 
-흰 화면 위에 장소·대상을 담은 검은 제목 띠와 구체적인 관전 포인트를 적은 둘째 줄이 표시됩니다. 사진 하단의 자막에도 프리텐다드를 적용합니다. 렌더러는 동봉된 정적 글꼴과 라이선스를 사용합니다. [Pretendard v1.3.9](https://github.com/orioncactus/pretendard/releases/tag/v1.3.9)
+글 주소를 확인하면 DeepSeek가 대본을 생성하고 첫 장면을 일곱 가지 스타일로 미리 보여줍니다. 중앙 슬라이드나 **모두 보기**에서 고른 스타일로 제작하세요. 같은 글의 완성 화면에서 스타일을 다시 고르면 사진·대본·음성을 재사용합니다. 스타일마다 사진 영역, 제목, 자막 및 배경이 함께 바뀝니다. CLI의 `SHORTS_TEMPLATE` 값은 `white`, `paper`, `grid`, `browser`, `blue`, `contrast`, `full`입니다. 세로 MP4와 미리보기는 같은 렌더링 정의를 사용합니다.
+
+패키지의 `fonts` 폴더에 프리텐다드, 고운바탕, 주아 글꼴과 각각의 배포 라이선스가 있습니다.
 
 [데스크톱 실행 및 빌드 방법](desktop/README.md)
 

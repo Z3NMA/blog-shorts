@@ -1,0 +1,310 @@
+[
+  {
+    "id": "white",
+    "name": "기본 화이트",
+    "photoTop": 326,
+    "photoHeight": 632,
+    "text": {
+      "Subject": {
+        "font": "Pretendard ExtraBold",
+        "size": 78,
+        "color": "FFFFFF",
+        "edge": "000000",
+        "outline": 6,
+        "box": true,
+        "bold": false,
+        "align": 5,
+        "x": 360,
+        "y": 177
+      },
+      "Hook": {
+        "font": "Pretendard ExtraBold",
+        "size": 78,
+        "color": "000000",
+        "edge": "000000",
+        "outline": 0,
+        "box": false,
+        "bold": false,
+        "align": 5,
+        "x": 360,
+        "y": 270
+      },
+      "Caption": {
+        "font": "Pretendard",
+        "size": 48,
+        "color": "FFFFFF",
+        "edge": "121212",
+        "outline": 2.6,
+        "box": false,
+        "bold": true,
+        "align": 2,
+        "x": 360,
+        "y": 930
+      }
+    }
+  },
+  {
+    "id": "paper",
+    "name": "종이 매거진",
+    "photoTop": 327,
+    "photoHeight": 630,
+    "text": {
+      "Subject": {
+        "font": "Gowun Batang",
+        "size": 62,
+        "color": "45342B",
+        "edge": "F4E7CB",
+        "outline": 4,
+        "box": true,
+        "bold": true,
+        "align": 5,
+        "x": 360,
+        "y": 154
+      },
+      "Hook": {
+        "font": "Pretendard ExtraBold",
+        "size": 59,
+        "color": "612C35",
+        "edge": "612C35",
+        "outline": 0,
+        "box": false,
+        "bold": false,
+        "align": 5,
+        "x": 360,
+        "y": 235
+      },
+      "Caption": {
+        "font": "Pretendard",
+        "size": 44,
+        "color": "FFEDD6",
+        "edge": "442A22",
+        "outline": 3,
+        "box": false,
+        "bold": true,
+        "align": 2,
+        "x": 360,
+        "y": 929
+      }
+    }
+  },
+  {
+    "id": "grid",
+    "name": "모눈 노트",
+    "photoTop": 323,
+    "photoHeight": 957,
+    "text": {
+      "Subject": {
+        "font": "Jua",
+        "size": 71,
+        "color": "29462E",
+        "edge": "C3EDA8",
+        "outline": 7,
+        "box": true,
+        "bold": false,
+        "align": 5,
+        "x": 360,
+        "y": 158
+      },
+      "Hook": {
+        "font": "Jua",
+        "size": 64,
+        "color": "FFF7D5",
+        "edge": "324935",
+        "outline": 2.6,
+        "box": false,
+        "bold": false,
+        "align": 5,
+        "x": 360,
+        "y": 241
+      },
+      "Caption": {
+        "font": "Pretendard",
+        "size": 46,
+        "color": "FFFFFF",
+        "edge": "35362F",
+        "outline": 2.8,
+        "box": false,
+        "bold": true,
+        "align": 2,
+        "x": 360,
+        "y": 935
+      }
+    }
+  },
+  {
+    "id": "browser",
+    "name": "브라우저 카드",
+    "photoTop": 348,
+    "photoHeight": 932,
+    "text": {
+      "Subject": {
+        "font": "Pretendard ExtraBold",
+        "size": 66,
+        "color": "101820",
+        "edge": "101820",
+        "outline": 0,
+        "box": false,
+        "bold": false,
+        "align": 4,
+        "x": 54,
+        "y": 184
+      },
+      "Hook": {
+        "font": "Pretendard ExtraBold",
+        "size": 58,
+        "color": "101820",
+        "edge": "101820",
+        "outline": 0,
+        "box": false,
+        "bold": false,
+        "align": 4,
+        "x": 54,
+        "y": 260
+      },
+      "Caption": {
+        "font": "Pretendard",
+        "size": 48,
+        "color": "A9EDFF",
+        "edge": "172632",
+        "outline": 4,
+        "box": false,
+        "bold": true,
+        "align": 2,
+        "x": 360,
+        "y": 944
+      }
+    }
+  },
+  {
+    "id": "blue",
+    "name": "블루 리뷰",
+    "photoTop": 353,
+    "photoHeight": 608,
+    "text": {
+      "Subject": {
+        "font": "Pretendard ExtraBold",
+        "size": 63,
+        "color": "FFFFFF",
+        "edge": "1D4FCB",
+        "outline": 5,
+        "box": true,
+        "bold": false,
+        "align": 5,
+        "x": 360,
+        "y": 176
+      },
+      "Hook": {
+        "font": "Pretendard ExtraBold",
+        "size": 57,
+        "color": "1749C4",
+        "edge": "F7F9FF",
+        "outline": 5,
+        "box": true,
+        "bold": false,
+        "align": 5,
+        "x": 360,
+        "y": 258
+      },
+      "Caption": {
+        "font": "Gowun Batang",
+        "size": 45,
+        "color": "FFFFFF",
+        "edge": "3C3233",
+        "outline": 5,
+        "box": true,
+        "bold": true,
+        "align": 2,
+        "x": 360,
+        "y": 923
+      }
+    }
+  },
+  {
+    "id": "contrast",
+    "name": "블랙 포인트",
+    "photoTop": 318,
+    "photoHeight": 962,
+    "text": {
+      "Subject": {
+        "font": "Pretendard ExtraBold",
+        "size": 69,
+        "color": "FFDF1B",
+        "edge": "0C0D0F",
+        "outline": 0,
+        "box": false,
+        "bold": false,
+        "align": 5,
+        "x": 360,
+        "y": 151
+      },
+      "Hook": {
+        "font": "Pretendard ExtraBold",
+        "size": 59,
+        "color": "FFFFFF",
+        "edge": "0C0D0F",
+        "outline": 0,
+        "box": false,
+        "bold": false,
+        "align": 5,
+        "x": 360,
+        "y": 228
+      },
+      "Caption": {
+        "font": "Pretendard",
+        "size": 45,
+        "color": "1C190B",
+        "edge": "FFDF1B",
+        "outline": 6,
+        "box": true,
+        "bold": true,
+        "align": 2,
+        "x": 360,
+        "y": 919
+      }
+    }
+  },
+  {
+    "id": "full",
+    "name": "사진 가득",
+    "photoTop": 0,
+    "photoHeight": 1280,
+    "text": {
+      "Subject": {
+        "font": "Jua",
+        "size": 72,
+        "color": "C4FD53",
+        "edge": "1A2114",
+        "outline": 3,
+        "box": false,
+        "bold": false,
+        "align": 5,
+        "x": 360,
+        "y": 166
+      },
+      "Hook": {
+        "font": "Pretendard ExtraBold",
+        "size": 59,
+        "color": "C4FD53",
+        "edge": "171D12",
+        "outline": 6,
+        "box": true,
+        "bold": false,
+        "align": 5,
+        "x": 360,
+        "y": 250
+      },
+      "Caption": {
+        "font": "Pretendard",
+        "size": 47,
+        "color": "FFFFFF",
+        "edge": "25231D",
+        "outline": 3,
+        "box": false,
+        "bold": true,
+        "align": 2,
+        "x": 360,
+        "y": 1005
+      }
+    }
+  }
+]

@@ -19,6 +19,7 @@ const ffmpeg = process.env.FFMPEG || 'ffmpeg';
 function run(cmd, args) {
   const env = {...process.env};
   delete env.DEEPSEEK_API_KEY;
+  delete env.GEMINI_API_KEY;
   const r = spawnSync(cmd, args, {cwd:dir, encoding:'utf8', windowsHide:true, env});
   if (r.error || r.status !== 0) throw Error(r.error?.message || r.stderr || r.stdout);
   return r;
@@ -75,7 +76,10 @@ if (process.env.SHORTS_PLAN_PATH) {
   writeFileSync(process.env.SHORTS_PLAN_PATH, JSON.stringify(plan, null, 2), {flag:'wx'});
 }
 writeFileSync(local('scenes.json'),JSON.stringify(plan.scenes,null,2));
-if (process.env.SHORTS_VOICE === 'deepseek') {
+if (process.env.SHORTS_VOICE === 'gemini') {
+  const {synthesizeGeminiScenes} = await import('./gemini-voice.mjs');
+  await synthesizeGeminiScenes(plan.scenes, dir);
+} else if (process.env.SHORTS_VOICE === 'deepseek') {
   const {synthesizeDeepSeekScenes} = await import('./deepseek-voice.mjs');
   await synthesizeDeepSeekScenes(plan.scenes, dir);
 } else if (process.env.SUPERTONIC_MODEL) {
@@ -107,6 +111,7 @@ function stamp(sec) {
 const assHeader = '[Script Info]\nScriptType: v4.00+\nPlayResX: 720\nPlayResY: 1280\n[V4+ Styles]\nFormat: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding\nStyle: Main,Malgun Gothic,49,&H00FFFFFF,&H00FFFFFF,&H00312018,&H80000000,-1,0,0,0,100,100,0,0,1,3,1,5,18,18,0,1\n[Events]\nFormat: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text\n';
 const event = (a,b,body) => 'Dialogue: 0,'+stamp(a)+','+stamp(b)+',Main,,0,0,0,,'+body+'\n';
 for (const [i,scene] of plan.scenes.entries()) {
+  console.log(`영상 합성 · ${i + 1}/${plan.scenes.length}장면`);
   const cached = process.env.PHOTO_DIR && path.resolve(process.env.PHOTO_DIR,scene.photo+'.jpg');
   if (cached) copyFileSync(cached,local('photo'));
   else writeFileSync(local('photo'),await download(photos[scene.photo-1].src));

@@ -4,13 +4,14 @@ Windows에서 네이버 블로그 글 주소를 받아 한국어 세로 MP4를 �
 
 ## 영상 만들기
 
-1. 앱에서 네이버 글 주소와 DeepSeek API 키를 입력합니다. 앱을 실행하기 전에 `DEEPSEEK_API_KEY` 환경 변수를 설정했다면 키 칸을 비울 수 있습니다.
-2. 내레이션을 고릅니다. Stella와 Tide는 DeepSeek의 유료 음성입니다. Supertonic 3와 Windows 한국어 음성은 로컬에서 합성하며 대본 작성에만 API 요금이 듭니다.
-3. **숏츠 만들기**를 누릅니다. 완성된 MP4는 기본적으로 사용자 동영상 폴더의 `Blog Shorts`에 저장됩니다. **저장 위치와 실행 설정**에서 변경할 수 있습니다.
+1. Windows 포터블 ZIP 전체를 원하는 폴더에 풀고 **blog-shorts.exe**를 실행합니다. 앱에서 네이버 글 주소와 DeepSeek API 키를 입력합니다. 앱을 실행하기 전에 `DEEPSEEK_API_KEY` 환경 변수를 설정했다면 키 칸을 비울 수 있습니다.
+2. 음성 엔진을 고릅니다. **Gemini 3.8 Flash TTS**는 Google AI Studio의 Gemini API 키 또는 `GEMINI_API_KEY` 환경 변수를 사용합니다. 목소리(Kore, Puck, Aoede)와 말투를 정할 수 있습니다. 대본은 DeepSeek, 음성은 Google 사용량으로 각각 청구됩니다. [Gemini API 키 발급](https://aistudio.google.com/apikey)
+3. Stella와 Tide는 DeepSeek의 유료 음성입니다. Supertonic 3와 Windows 한국어 음성은 로컬에서 합성하며 대본 작성에만 API 요금이 듭니다.
+4. **숏츠 만들기**를 누릅니다. 완성된 MP4는 기본적으로 사용자 동영상 폴더의 `Blog Shorts`에 저장됩니다. **저장 위치와 실행 설정**에서 변경할 수 있습니다.
 
-앱에 입력한 API 키는 세션 메모리에서만 사용합니다. 음성 선택, 출력 폴더 및 도구 경로는 다음 실행을 위해 저장됩니다.
+화면은 Windows의 밝은 모드와 어두운 모드를 따릅니다. 앱에 입력한 API 키는 세션 메모리에서만 사용합니다. 음성 선택, 출력 폴더 및 도구 경로는 다음 실행을 위해 저장됩니다.
 
-저장 폴더의 같은 이름을 가진 `.plan.json`에는 장면 순서와 대본이 들어 있습니다. 같은 대본으로 CLI에서 음성만 바꾸어 비교할 수 있습니다.
+저장 폴더의 같은 이름을 가진 `.plan.json`에는 장면 순서와 대본이 들어 있습니다. 장면별 대사를 음성 합성과 자막에 함께 사용합니다.
 
 ## 실행 환경
 
@@ -20,6 +21,8 @@ Windows에서 네이버 블로그 글 주소를 받아 한국어 세로 MP4를 �
 - Windows 음성 선택 시 한국어 데스크톱 합성 음성이 필요합니다.
 
 실행 파일과 같은 폴더에 `node.exe` 또는 `ffmpeg.exe`가 있으면 우선 사용합니다. 도구가 PATH에 있으면 파일 이름만으로도 실행할 수 있습니다. FFmpeg 경로는 화면에서 지정할 수 있습니다. Node.js 경로를 직접 지정할 때는 `SHORTS_NODE` 환경 변수를 사용합니다.
+
+포터블 ZIP에는 Node.js와 FFmpeg가 포함됩니다. Supertonic을 선택하면 모델 폴더와 Python 경로를 같은 화면에서 입력할 수 있습니다.
 
 ## 개발 및 빌드
 

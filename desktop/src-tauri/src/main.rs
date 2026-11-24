@@ -25,6 +25,12 @@ struct Studio {
 struct Job {
     url: String,
     api_key: String,
+    #[serde(default)]
+    gemini_key: String,
+    #[serde(default)]
+    gemini_voice: String,
+    #[serde(default)]
+    gemini_style: String,
     voice: String,
     output_folder: String,
     ffmpeg: String,
@@ -36,6 +42,7 @@ struct Job {
 #[serde(rename_all = "camelCase")]
 struct Defaults {
     has_key: bool,
+    has_gemini_key: bool,
     output_folder: String,
     ffmpeg: String,
     python: String,
@@ -65,6 +72,7 @@ fn defaults(app: AppHandle) -> Result<Defaults, String> {
         .join("Blog Shorts");
     Ok(Defaults {
         has_key: env::var("DEEPSEEK_API_KEY").is_ok_and(|v| !v.trim().is_empty()),
+        has_gemini_key: env::var("GEMINI_API_KEY").is_ok_and(|v| !v.trim().is_empty()),
         output_folder: folder.to_string_lossy().into_owned(),
         ffmpeg: tool("FFMPEG", "ffmpeg.exe"),
         python: tool("SHORTS_PYTHON", "python.exe"),
@@ -79,7 +87,7 @@ fn command(executable: &str) -> Command {
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000);
     }
-    cmd.env_remove("DEEPSEEK_API_KEY").stdin(Stdio::null());
+    cmd.env_remove("DEEPSEEK_API_KEY").env_remove("GEMINI_API_KEY").stdin(Stdio::null());
     cmd
 }
 
@@ -110,6 +118,11 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
     if key.trim().is_empty() {
         return Err("DeepSeek API 키를 입력하세요.".into());
     }
+    let gemini_key = if job.gemini_key.trim().is_empty() {
+        env::var("GEMINI_API_KEY").unwrap_or_default()
+    } else {
+        job.gemini_key.trim().to_owned()
+    };
     let folder = PathBuf::from(job.output_folder.trim());
     if !folder.is_absolute() {
         return Err("저장 폴더의 전체 경로를 입력하세요.".into());
@@ -147,7 +160,7 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
     } else if cfg!(debug_assertions) {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../shorts.mjs")
     } else {
-        return Err("engine 폴더가 누락되었습니다. 앱 파일을 함께 설치하세요.".into());
+        return Err("engine 폴더가 누락되었습니다. ZIP 전체를 새 폴더에 풀고 실행하세요.".into());
     };
     let node = tool("SHORTS_NODE", "node.exe");
     preflight(
@@ -172,6 +185,19 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
         .env_remove("POST_HTML")
         .env_remove("PHOTO_DIR");
     match job.voice.as_str() {
+        "gemini" => {
+            if gemini_key.trim().is_empty() {
+                return Err("Google AI Studio에서 발급한 Gemini API 키를 입력하세요.".into());
+            }
+            if !matches!(job.gemini_voice.as_str(), "Kore" | "Puck" | "Aoede")
+                || !matches!(job.gemini_style.as_str(), "natural" | "calm" | "lively") {
+                return Err("Gemini 목소리와 말투를 다시 선택하세요.".into());
+            }
+            worker.env("SHORTS_VOICE", "gemini")
+                .env("GEMINI_API_KEY", gemini_key.trim())
+                .env("GEMINI_VOICE", &job.gemini_voice)
+                .env("GEMINI_STYLE", &job.gemini_style);
+        }
         "stella" | "tide" => {
             worker
                 .env("SHORTS_VOICE", "deepseek")
@@ -211,6 +237,8 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
                     "render-progress",
                     "장면 구성이 끝났습니다. 음성과 영상을 제작하고 있습니다.",
                 );
+            } else if line.starts_with("Gemini 음성 · ") || line.starts_with("영상 합성 · ") {
+                let _ = handle.emit("render-progress", line);
             }
         }
     });
@@ -220,7 +248,10 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
     let _ = progress.join();
     if !result.status.success() {
         let _ = fs::remove_file(&partial);
-        let stderr = String::from_utf8_lossy(&result.stderr).replace(&key, "[비공개]");
+        let mut stderr = String::from_utf8_lossy(&result.stderr).replace(&key, "[비공개]");
+        if !gemini_key.trim().is_empty() {
+            stderr = stderr.replace(gemini_key.trim(), "[비공개]");
+        }
         let message = stderr
             .lines()
             .find(|s| s.starts_with("Error:"))
@@ -265,26 +296,10 @@ fn open_output(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-async fn preview_stella(app: AppHandle, api_key: String) -> Result<String, String> {
-    let key = if api_key.trim().is_empty() { env::var("DEEPSEEK_API_KEY").unwrap_or_default() } else { api_key };
-    if key.trim().is_empty() { return Err("DeepSeek API 키를 입력하세요.".into()); }
-    let script = app.path().resource_dir().map_err(|e| e.to_string())?.join("engine/preview-stella.mjs");
-    tauri::async_runtime::spawn_blocking(move || {
-        let out = command(&tool("SHORTS_NODE","node.exe")).env("DEEPSEEK_API_KEY", key.trim())
-            .arg(script).output().map_err(|e| e.to_string())?;
-        if !out.status.success() {
-            let err = String::from_utf8_lossy(&out.stderr);
-            return Err(err.lines().find(|s| s.starts_with("Error:")).unwrap_or("음성 서버에 연결할 수 없습니다.").to_string());
-        }
-        String::from_utf8(out.stdout).map_err(|e| e.to_string())
-    }).await.map_err(|e| e.to_string())?
-}
-
 fn main() {
     tauri::Builder::default()
         .manage(Studio::default())
-        .invoke_handler(tauri::generate_handler![defaults, generate, open_output, preview_stella])
+        .invoke_handler(tauri::generate_handler![defaults, generate, open_output])
         .run(tauri::generate_context!())
         .expect("Blog Shorts startup failed");
 }

@@ -3,57 +3,64 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>Blog Shorts</title>
   <link rel="stylesheet" href="studio.css">
   <script type="module" src="studio.js"></script>
 </head>
 <body>
-  <header><div class="wordmark"><i aria-hidden="true"></i>Blog Shorts</div><span>제작 스튜디오</span></header>
   <main>
-    <h1>블로그로 숏츠 만들기</h1>
-    <p class="intro">네이버 글의 사진과 내용을 바탕으로 대본, 내레이션, 자막이 있는 영상을 만듭니다.</p>
+    <header>
+      <div class="brand"><span class="mark" aria-hidden="true"><i></i></span>Blog Shorts</div>
+      <h1>새 숏츠 만들기</h1>
+      <p>블로그 글의 사진과 대사로 내레이션과 자막이 담긴 세로 영상을 만드세요.</p>
+    </header>
     <form id="form">
       <fieldset id="inputs" disabled>
-        <label for="url">네이버 블로그 글 주소</label>
-        <input id="url" placeholder="https://blog.naver.com/아이디/글번호" type="url" required autofocus>
-        <div class="pair">
-          <div><label for="key">DeepSeek API 키</label>
-            <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="API 키 입력">
-            <small id="key-hint">입력한 키는 앱을 닫으면 지워집니다.</small>
-          </div>
-          <div><label for="voice">내레이션</label>
-            <select id="voice">
-              <option value="stella">DeepSeek · Stella</option>
-              <option value="tide">DeepSeek · Tide</option>
-              <option value="supertonic">로컬 · Supertonic 3</option>
-              <option value="windows">로컬 · Windows 한국어</option>
-            </select>
-            <small id="voice-hint">대본과 음성에 API 요금이 적용됩니다.</small>
-          </div>
-        </div>
-        <details id="settings">
-          <summary>저장 위치와 실행 설정</summary>
-          <div class="settings-fields">
-            <label for="folder">MP4 저장 폴더</label><input id="folder" required>
-            <label for="ffmpeg">FFmpeg 실행 경로</label><input id="ffmpeg" required>
-            <div id="local-options" hidden>
-              <label for="python">Python 실행 경로</label><input id="python">
-              <label for="model">Supertonic 3 모델 폴더</label><input id="model">
+        <section class="group" aria-labelledby="post-heading">
+          <h2 id="post-heading">원본 글</h2>
+          <div class="card post">
+            <label for="url">네이버 블로그 글 주소</label>
+            <div class="url-field">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13.8 4-4M8.2 15.8l-1 1a3.5 3.5 0 0 1-5-5l4-4a3.5 3.5 0 0 1 5 0m1.6 8.4a3.5 3.5 0 0 0 5 0l4-4a3.5 3.5 0 0 0-5-5l-1 1"/></svg>
+              <input id="url" type="url" placeholder="https://blog.naver.com/아이디/글번호" spellcheck="false" required>
             </div>
           </div>
+        </section>
+        <section class="group" aria-labelledby="audio-heading">
+          <h2 id="audio-heading">대본과 내레이션</h2>
+          <div class="card">
+            <div class="row"><div><label for="voice">음성 엔진</label><small id="voice-hint"></small></div>
+              <select id="voice" aria-describedby="voice-hint">
+                <option value="stella">DeepSeek · Stella</option><option value="tide">DeepSeek · Tide</option>
+                <option value="gemini">Gemini 3.8 Flash TTS</option>
+                <option value="supertonic">Supertonic 3</option><option value="windows">Windows 한국어</option>
+              </select>
+            </div>
+            <div class="row" id="gemini-options" hidden>
+              <div class="inline-field"><label for="geminiVoice">목소리</label><select id="geminiVoice"><option>Kore</option><option>Puck</option><option>Aoede</option></select></div>
+              <div class="inline-field"><label for="geminiStyle">말투</label><select id="geminiStyle"><option value="natural">자연스럽게</option><option value="calm">차분하게</option><option value="lively">활기차게</option></select></div>
+            </div>
+            <div class="row"><div><label for="key">DeepSeek API 키</label><small id="key-hint">대본과 장면 구성에 사용합니다.</small></div>
+              <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="API 키 입력" aria-describedby="key-hint"></div>
+            <div class="row" id="gemini-credentials" hidden><div><label for="geminiKey">Gemini API 키</label><small>Google AI Studio에서 발급한 키</small></div>
+              <input id="geminiKey" type="password" autocomplete="off" spellcheck="false" placeholder="API 키 입력"></div>
+            <div id="local-options" hidden>
+              <div class="row"><label for="python">Python 실행 경로</label><input id="python" spellcheck="false"></div>
+              <div class="row"><label for="model">Supertonic 모델 폴더</label><input id="model" spellcheck="false"></div>
+            </div>
+          </div>
+          <p class="footnote">입력한 API 키는 앱을 닫으면 지워집니다.</p>
+        </section>
+        <details class="card" id="settings">
+          <summary>저장 위치와 실행 설정</summary>
+          <div class="row"><label for="folder">MP4 저장 폴더</label><input id="folder" required spellcheck="false"></div>
+          <div class="row"><label for="ffmpeg">FFmpeg 실행 경로</label><input id="ffmpeg" required spellcheck="false"></div>
         </details>
-        <div class="actions"><span class="format">세로 9:16 <b>·</b> MP4</span><button class="primary" type="submit">숏츠 만들기</button></div>
+        <div class="actions"><span>세로 9:16 <b>·</b> MP4</span><button id="create" type="submit">숏츠 만들기</button></div>
       </fieldset>
     </form>
-    <section>
-      <h2>제천 대본 목소리 비교</h2>
-      <p>같은 10장면의 대사를 듣습니다. 블로그 주소는 생략해도 됩니다.</p>
-      <label>Supertonic 3 · 기존 영상 음성<br><audio controls preload="none" src="jecheon-supertonic.mp3"></audio></label>
-      <button type="button" id="preview">Stella 샘플 생성 · 약 10원</button>
-      <p id="preview-status" role="status"></p>
-      <audio id="stella-audio" aria-label="Stella 제천 대본" controls hidden></audio>
-    </section>
-    <section id="result" hidden aria-live="polite">
+    <section class="card result" id="result" role="status" aria-live="polite" hidden>
       <h2 id="state"></h2><p id="message"></p>
       <button type="button" id="open" hidden>저장 폴더 열기</button>
     </section>

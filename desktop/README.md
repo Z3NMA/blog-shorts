@@ -38,3 +38,5 @@ npm exec --yes --package=@tauri-apps/cli@2 -- tauri build
 ```
 
 정적 화면은 실행 파일에 포함됩니다. 배포용 리소스는 레포 최상위의 엔진 모듈과 음성 스크립트를 `engine` 폴더에 담습니다. 수동으로 실행 파일을 복사할 때는 대상 폴더에 `engine`도 함께 복사하세요.
+
+v0.2.0 사용자용 설치본은 추가 설정 `src-tauri/release.windows.json`으로 패키징합니다. `src-tauri/release-runtime`에 Windows x64용 Node.js 24.22.3의 node.exe, FFmpeg 9.0.2 essentials의 ffmpeg.exe, WebView2Loader.dll 및 notices 폴더의 배포 고지를 준비한 다음 위 빌드 명령에 `--config src-tauri/release.windows.json`을 추가하세요. 앱과 필수 실행 파일을 현재 사용자용으로 설치합니다.

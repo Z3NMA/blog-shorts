@@ -1,0 +1,17 @@
+{
+  "bundle": {
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["Korean", "English"],
+        "displayLanguageSelector": false
+      }
+    },
+    "resources": {
+      "release-runtime/node.exe": "node.exe",
+      "release-runtime/ffmpeg.exe": "ffmpeg.exe",
+      "release-runtime/WebView2Loader.dll": "WebView2Loader.dll",
+      "release-runtime/notices/*": "notices/"
+    }
+  }
+}

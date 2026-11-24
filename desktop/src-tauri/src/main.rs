@@ -133,7 +133,7 @@ fn detect_ffmpeg() -> Result<PathBuf, String> {
             return Ok(candidate);
         }
     }
-    Err("FFmpeg를 실행할 수 없습니다. 무설치 ZIP 전체를 새 폴더에 풀어 주세요.".into())
+    Err("FFmpeg를 실행할 수 없습니다. 배포용 blog-shorts.exe를 다시 실행하세요.".into())
 }
 
 #[tauri::command]
@@ -208,7 +208,7 @@ fn engine(app: &AppHandle, project: &Project) -> Result<Command, String> {
     } else if cfg!(debug_assertions) {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../shorts.mjs")
     } else {
-        return Err("engine 폴더가 누락되었습니다. ZIP 전체를 새 폴더에 풀고 실행하세요.".into());
+        return Err("제작 엔진을 찾을 수 없습니다. 배포용 blog-shorts.exe를 다시 실행하세요.".into());
     };
     let node = tool("SHORTS_NODE", "node.exe");
     preflight(

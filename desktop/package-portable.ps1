@@ -1,13 +1,18 @@
 # Run from PowerShell after compiling the Windows x64 release binary.
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName='SingleFile')]
 param(
     [Parameter(Mandatory)][string]$Executable,
     [Parameter(Mandatory)][string]$RuntimeDirectory,
     [Parameter(Mandatory)][string]$StageDirectory,
-    [Parameter(Mandatory)][string]$OutputZip
+    [Parameter(Mandatory,ParameterSetName='Zip')][string]$OutputZip,
+    [Parameter(Mandatory,ParameterSetName='SingleFile')][string]$FixedRuntimeDirectory,
+    [Parameter(Mandatory,ParameterSetName='SingleFile')][string]$OutputExe
 )
 $ErrorActionPreference = 'Stop'
-if (Test-Path -LiteralPath $OutputZip) { throw "Output ZIP already exists: $OutputZip" }
+$singleFile = $PSCmdlet.ParameterSetName -eq 'SingleFile'
+$destination = if ($singleFile) { $OutputExe } else { $OutputZip }
+if (Test-Path -LiteralPath $destination) { throw "Output already exists: $destination" }
+$destination = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($destination)
 $stage = Join-Path $StageDirectory 'Blog Shorts'
 if (Test-Path -LiteralPath $stage) { throw "Choose an empty staging directory: $StageDirectory" }
 $engine = New-Item -ItemType Directory -Path (Join-Path $stage 'engine') -Force
@@ -21,4 +26,45 @@ foreach ($module in 'shorts.mjs', 'video-templates.mjs', 'deepseek-planner.mjs',
 Copy-Item -LiteralPath (Join-Path "$PSScriptRoot/.." 'fonts') -Destination $engine.FullName -Recurse
 Copy-Item -LiteralPath (Join-Path "$PSScriptRoot/.." 'layouts') -Destination $engine.FullName -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination $stage
-Compress-Archive -LiteralPath $stage -DestinationPath $OutputZip -CompressionLevel Optimal
+if (!$singleFile) {
+    Compress-Archive -LiteralPath $stage -DestinationPath $destination -CompressionLevel Optimal
+    return
+}
+
+$fixed = Get-Item -LiteralPath (Join-Path $FixedRuntimeDirectory 'msedgewebview2.exe')
+$signature = Get-AuthenticodeSignature $fixed.FullName
+if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'CN=Microsoft Corporation,') {
+    throw 'Use the Microsoft-signed Windows x64 Fixed Version Runtime.'
+}
+Copy-Item -LiteralPath $FixedRuntimeDirectory -Destination (Join-Path $stage 'webview') -Recurse
+Add-Content -LiteralPath (Join-Path $stage 'notices/Third-party.txt') -Value @(
+    ('Microsoft Edge WebView2 Fixed Version Runtime ' + $fixed.VersionInfo.ProductVersion)
+    'https://developer.microsoft.com/microsoft-edge/webview2/'
+)
+
+$workspace = (Get-Item -LiteralPath $StageDirectory).FullName
+$archive = Join-Path $workspace 'runtime.zip'
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[IO.Compression.ZipFile]::CreateFromDirectory((Get-Item -LiteralPath $stage).FullName, $archive)
+$hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
+$version = (Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'src-tauri/tauri.conf.json') | ConvertFrom-Json).version
+if ((Get-Item -LiteralPath $Executable).VersionInfo.ProductVersion -ne $version) {
+    throw "Rebuild the Tauri application for version $version."
+}
+$metadata = Join-Path $workspace 'Package.cs'
+@"
+using System.Reflection;
+[assembly: AssemblyTitle("Blog Shorts")]
+[assembly: AssemblyProduct("Blog Shorts")]
+[assembly: AssemblyVersion("$version.0")]
+[assembly: AssemblyInformationalVersion("$version")]
+internal static class Package { internal const string Hash = "$hash"; }
+"@ | Set-Content -LiteralPath $metadata -Encoding UTF8
+$compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
+$launcher = Join-Path $workspace 'blog-shorts.exe'
+& $compiler /nologo /target:winexe /platform:x64 /optimize+ /codepage:65001 "/out:$launcher" `
+    "/win32icon:$PSScriptRoot/src-tauri/icons/icon.ico" "/resource:$archive,runtime.zip" `
+    /reference:System.IO.Compression.dll /reference:System.Windows.Forms.dll /reference:System.Drawing.dll `
+    (Join-Path $PSScriptRoot 'portable/Launcher.cs') $metadata
+if ($LASTEXITCODE -ne 0) { throw 'Single-file launcher compilation failed.' }
+[IO.File]::Move($launcher, $destination)

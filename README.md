@@ -4,7 +4,7 @@
 
 ## 데스크톱 앱
 
-Windows 10/11 64비트 사용자는 [Releases](https://github.com/Z3NMA/blog-shorts/releases)에서 최신 포터블 ZIP을 받아 전체 압축을 풀고 **blog-shorts.exe**를 실행하세요. 포터블 버전에는 Node.js, FFmpeg, 프리텐다드 글꼴이 들어 있습니다.
+Windows 10/11 x64에서는 **blog-shorts.exe** 한 파일을 내려받아 실행하세요. 첫 실행 때 앱이 사용자 폴더에 Node.js, FFmpeg, 글꼴과 WebView2를 풀고 다음 실행부터 재사용합니다. [Windows 단일 실행 파일 다운로드](https://github.com/Z3NMA/blog-shorts/releases/latest/download/blog-shorts.exe)
 
 Windows용 Tauri 앱에서 블로그 주소와 DeepSeek·Gemini API 키를 입력합니다. Rust가 로컬 렌더러를 실행합니다. DeepSeek Flash에는 글 제목, 사진 번호와 주변 문장을 보내 제목·사진 순서·대사를 한 번에 요청합니다. v0.2.1부터 음성 합성에 보낸 대사를 화면에도 그대로 표시합니다. 긴 대사는 최대 두 줄씩 나누어 보여줍니다. 앱에서 영상을 만들 때 ChatGPT나 Codex 호출은 발생하지 않습니다.
 

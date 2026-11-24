@@ -3,6 +3,7 @@ import {existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, copyFil
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {createDeepSeekPlan} from './deepseek-planner.mjs';
 
 const [source, output = 'shorts.mp4', scriptFile] = process.argv.slice(2);
 if (!source) throw Error('node shorts.mjs NAVER_URL [OUTPUT.mp4] [SCRIPT.json]');
@@ -16,7 +17,9 @@ const dir = mkdtempSync(path.join(tmpdir(), 'blog-shorts-'));
 const local = name => path.join(dir, name);
 const ffmpeg = process.env.FFMPEG || 'ffmpeg';
 function run(cmd, args) {
-  const r = spawnSync(cmd, args, {cwd:dir, encoding:'utf8', windowsHide:true});
+  const env = {...process.env};
+  delete env.DEEPSEEK_API_KEY;
+  const r = spawnSync(cmd, args, {cwd:dir, encoding:'utf8', windowsHide:true, env});
   if (r.error || r.status !== 0) throw Error(r.error?.message || r.stderr || r.stdout);
   return r;
 }
@@ -30,11 +33,15 @@ const clean = s => s.replace(/<[^>]+>/g,' ').replace(/&nbsp;|&#160;/g,' ')
 const html = process.env.POST_HTML ? readFileSync(process.env.POST_HTML,'utf8') : (await download(mobile)).toString('utf8');
 const title = clean(html.match(/<meta property="og:title" content="([^"]*)"/)?.[1] || '블로그 이야기');
 const photos = [];
+const introduction = [];
 for (const m of html.matchAll(/<img\b[^>]*se-image-resource[^>]*>|<p\b[^>]*se-text-paragraph[^>]*>[\s\S]*?<\/p>/g)) {
   if (m[0].startsWith('<img')) {
     const src = (m[0].match(/data-lazy-src="([^"]+)"/) || m[0].match(/src="([^"]+)"/))?.[1];
     if (src) photos.push({src:clean(src),lines:[]});
-  } else if (photos.length) photos.at(-1).lines.push(clean(m[0]));
+  } else {
+    const lines = photos.length ? photos.at(-1).lines : introduction;
+    lines.push(clean(m[0]));
+  }
 }
 function autoPlan() {
   const choices = [];
@@ -48,12 +55,28 @@ function autoPlan() {
   const scenes = Array.from({length:count},(_,i) => choices[Math.round(i*(choices.length-1)/Math.max(1,count-1))]);
   return {title:title.split(/\s+/).slice(0,6).join(' '),scenes};
 }
-const plan = scriptFile ? JSON.parse(readFileSync(scriptFile,'utf8')) : autoPlan();
+let plan;
+if (scriptFile) {
+  plan = JSON.parse(readFileSync(scriptFile,'utf8'));
+} else if (process.env.SHORTS_PLANNER === 'deepseek') {
+  console.log('DeepSeek에서 대본과 사진 순서를 구성하고 있습니다.');
+  plan = await createDeepSeekPlan(title, introduction.join(' '), photos);
+} else {
+  plan = autoPlan();
+}
 if (!plan.scenes?.length || !plan.title || plan.scenes.some(s=>!photos[s.photo-1] || !s.text?.trim()))
   throw Error('Invalid title, photo number or narration.');
 console.log('Photos:',photos.length,'Scenes:',plan.scenes.length,'Working files:',dir);
+writeFileSync(local('plan.json'),JSON.stringify(plan,null,2));
+if (process.env.SHORTS_PLAN_PATH) {
+  // Preserve the paid plan even if a later voice or rendering step fails.
+  writeFileSync(process.env.SHORTS_PLAN_PATH, JSON.stringify(plan, null, 2), {flag:'wx'});
+}
 writeFileSync(local('scenes.json'),JSON.stringify(plan.scenes,null,2));
-if (process.env.SUPERTONIC_MODEL) {
+if (process.env.SHORTS_VOICE === 'deepseek') {
+  const {synthesizeDeepSeekScenes} = await import('./deepseek-voice.mjs');
+  await synthesizeDeepSeekScenes(plan.scenes, dir);
+} else if (process.env.SUPERTONIC_MODEL) {
   run(process.env.SHORTS_PYTHON || 'python', [
     fileURLToPath(new URL('voice_ai.py',import.meta.url)),local('scenes.json'),dir,
     path.resolve(process.env.SUPERTONIC_MODEL)
@@ -91,7 +114,7 @@ for (const [i,scene] of plan.scenes.entries()) {
   const headings=plan.title.split('\n').flatMap(line=>wrap(assText(line),15));
   const heading=headings.map((row,k)=>(k?'\\N{\\c&H41BDFF&}':'')+row).join('');
   let ass=assHeader+event(0,end,'{\\pos(360,130)\\fs62}'+heading);
-  const rows=wrap(assText(scene.text),15);
+  const rows=wrap(assText(scene.caption || scene.text),15);
   const groups=[];
   for(let j=0;j<rows.length;j+=2) groups.push(rows.slice(j,j+2));
   const weight=groups.map(g=>g.join('').length);

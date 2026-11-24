@@ -1,6 +1,31 @@
 # 블로그 쇼츠
 
-공개 네이버 블로그 글 한 편을 한국어 음성, 자막, 원문 사진으로 구성한 세로 MP4로 만듭니다. 사진은 장면마다 한 번 잘라 고정합니다. 모델과 실행 패키지 설치 후에는 글과 사진을 받는 단계만 인터넷을 사용합니다.
+공개 네이버 블로그 링크로 원문 사진과 한국어 내레이션을 담은 세로 MP4를 만듭니다. 사진은 장면마다 한 번 잘라 고정합니다.
+
+## 데스크톱 앱
+
+Windows용 Tauri 앱에서 블로그 주소와 DeepSeek API 키를 입력하고 음성을 선택합니다. Rust가 로컬 렌더러를 실행합니다. DeepSeek Flash에는 글 제목, 사진 번호와 주변 문장을 보내 제목·사진 순서·대사·자막을 한 번에 요청합니다. 앱에서 영상을 만들 때 ChatGPT나 Codex 호출은 발생하지 않습니다.
+
+음성까지 DeepSeek로 만들면 각 장면의 대사를 음성 API에 보냅니다. Stella와 Tide 중에서 선택할 수 있습니다. 무료 음성은 로컬 Supertonic 3 또는 Windows 한국어 음성을 사용합니다. MP4 합성은 모든 모드에서 로컬 FFmpeg가 수행합니다.
+
+[데스크톱 실행 및 빌드 방법](desktop/README.md)
+
+현재 대본 모델은 사진 앞뒤의 글을 읽어 사진을 고릅니다. 모델이 고른 사진 번호와 인용 문구를 입력 자료와 대조합니다. 인용 문구가 일치해도 장면 설명이나 가격에 오류가 있을 수 있습니다.
+
+### 비용과 비교 방법
+
+2026년 11월 24일 가격 기준으로 입력 3,000토큰·출력 1,000토큰에 캐시 할인을 적용하지 않은 Flash 대본 한 번은 약 $0.00105~0.00210입니다. 제천 예시 대본 327자에 DeepSeek 음성을 적용하면 할인 단가에서 약 $0.00736가 추가됩니다. 실제 비용은 토큰·글자 수와 청구 시점의 단가에 따릅니다. [대본·음성 요금표](https://api-docs.deepseek.com/quick_start/pricing/) · [음성 API 안내](https://api-docs.deepseek.com/guides/tts/)
+
+같은 대본으로 음성을 비교하려면 아래 CLI의 세 번째 인수로 `jecheon.json` 또는 이전 실행에서 생성된 `plan.json`을 지정하세요. 대본 작성을 건너뛰고 동일한 문장을 읽으므로 가격·음식 이름의 발음, 문장 끝 억양, 장면 사이 호흡을 직접 비교할 수 있습니다.
+
+```powershell
+# DEEPSEEK_API_KEY 환경변수가 설정된 PowerShell에서 실행
+$env:SHORTS_VOICE = 'deepseek'
+$env:DEEPSEEK_VOICE = 'stella'
+node shorts.mjs https://blog.naver.com/lumi6_6/224480520476 stella.mp4 jecheon.json
+```
+
+CLI에서 대본까지 새로 생성하려면 `SHORTS_PLANNER=deepseek`를 환경변수로 설정하고 대본 파일 인수를 생략하세요. 기본 CLI는 키 없이 기존 로컬 대본 추출 방식을 사용합니다.
 
 ## 준비
 

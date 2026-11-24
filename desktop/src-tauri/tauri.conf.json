@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Blog Shorts",
+  "version": "0.2.0",
+  "identifier": "com.z3nma.blogshorts",
+  "build": { "frontendDist": "../ui" },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      { "label": "main", "title": "Blog Shorts", "width": 820, "height": 760, "minWidth": 520, "minHeight": 520 }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/icon.ico"],
+    "resources": {
+      "../../*.mjs": "engine/",
+      "../../voice_ai.py": "engine/voice_ai.py",
+      "../../voice.ps1": "engine/voice.ps1"
+    }
+  }
+}

@@ -9,13 +9,25 @@ import {synthesizeDeepSeekScenes} from '../deepseek-voice.mjs';
 const photo = {lines:['따끈한 빵에 고기를 올려 먹어요.']};
 const scene = {photo:1, text:'빵과 고기를 함께 먹어요.', evidence:'빵에 고기를'};
 const opening = {title:'바비큐 한 접시\n빵에 올려 한 입', photo:1, evidence:scene.evidence};
+const wrapUp = '따끈한 빵 좋아하시면 바비큐를 올려 한 입 드셔 보세요.';
+const singleSceneDraft = {openingText:scene.text, scenes:[], closing:null};
+const singleScene = {...scene, text:scene.text + ' ' + wrapUp};
 const completion = value => Response.json({choices:[
   {finish_reason:'stop', message:{content:JSON.stringify(value)}}
 ]});
 
-test('근거 있는 제목과 첫 사진을 먼저 고르고 다음 요청에서 그 조합으로 대사를 쓴다', async () => {
+function writerAndReviewer(draft, review) {
+  return async (_url, options) => {
+    const input = JSON.parse(JSON.parse(options.body).messages[1].content);
+    return completion(input.scenes ? review : draft);
+  };
+}
+
+test('세 번째 요청은 검증된 제목과 첫 장면부터 마지막까지의 전체 대사를 순서대로 읽는다', async () => {
   const calls = [];
-  const tea = {photo:2, text:'차는 따뜻하게 나와요.', evidence:'따뜻한 차'};
+  const middle = {photo:2, text:'고기는 참나무로 훈연했어요.', evidence:'참나무로 훈연'};
+  const tea = {photo:3, text:'차는 따뜻하게 나와요.', evidence:'따뜻한 차'};
+  const invitation = '은은한 훈연 향 좋아하시면 바비큐를 빵에 올려 드셔 보세요.';
   const request = async (_url, options) => {
     const body = JSON.parse(options.body);
     const input = JSON.parse(body.messages[1].content);
@@ -24,12 +36,18 @@ test('근거 있는 제목과 첫 사진을 먼저 고르고 다음 요청에서
       assert.equal(input.opening, undefined);
       return completion({candidates:[{...opening, evidence:'원문에 없는 가격'}, opening]});
     }
-    assert.deepEqual(input, {...calls[0], opening});
-    return completion({openingText:scene.text, scenes:[scene, tea, tea]});
+    if (calls.length === 2) {
+      assert.deepEqual(input, {...calls[0], opening});
+      return completion({openingText:scene.text, scenes:[scene, middle, tea], closing:tea});
+    }
+    assert.deepEqual(input, {title:opening.title, scenes:[scene, middle, tea]});
+    assert.match(body.messages[0].content, /시청자에게 직접/);
+    return completion({wrapUp:invitation});
   };
-  const plan = await createDeepSeekPlan('바비큐', '', [photo, {lines:['따뜻한 차도 나와요.']}], {apiKey:'test', request});
-  assert.equal(calls.length, 2);
-  assert.deepEqual(plan, {title:opening.title, scenes:[scene, tea]});
+  const photos = [photo, {lines:['참나무로 훈연했어요.']}, {lines:['따뜻한 차도 나와요.']}];
+  const plan = await createDeepSeekPlan('바비큐', '', photos, {apiKey:'test', request});
+  assert.equal(calls.length, 3);
+  assert.deepEqual(plan, {title:opening.title, scenes:[scene, middle, {...tea, text:tea.text + ' ' + invitation}]});
 });
 
 test('두 단계 모두 사진 번호와 인용을 확인한다', async () => {
@@ -37,16 +55,28 @@ test('두 단계 모두 사진 번호와 인용을 확인한다', async () => {
     apiKey:'test', request:async () => completion({candidates:[{...opening, photo:2}]})
   }), /첫 사진/);
   function planFor(editedScene) {
-    const request = async () => completion({openingText:scene.text, scenes:[editedScene]});
+    const request = writerAndReviewer({openingText:scene.text, scenes:[], closing:editedScene}, {wrapUp});
     return createDeepSeekPlan('바비큐', '', [photo, photo], {apiKey:'test', cachedOpening:opening, request});
   }
   const next = {...scene, photo:2};
-  assert.deepEqual((await planFor({...next, caption:'별도 요약 자막'})).scenes[1], next);
+  assert.deepEqual((await planFor({...next, caption:'별도 요약 자막'})).scenes[1], {...next, text:next.text + ' ' + wrapUp});
   await assert.rejects(planFor({...next, photo:3}), /사진 번호/);
   await assert.rejects(planFor({...next, evidence:'빠른 예약 필수'}), /근거/);
+  await assert.rejects(planFor({...next, photo:1}), /마무리/);
 });
 
-test('집필이 실패하면 저장해 둔 첫 장면으로 집필만 재시도한다', async () => {
+test('마지막 사진을 중간과 중복해도 근거 있는 마무리 대사가 맨 끝에 남는다', async () => {
+  const middle = {...scene, photo:2};
+  const closing = {photo:3, text:'마지막 한 입도 빵과 함께 먹기 좋아요.', evidence:scene.evidence};
+  const write = draft => createDeepSeekPlan('바비큐', '', [photo, photo, photo], {
+    apiKey:'test', cachedOpening:opening, request:writerAndReviewer(draft, {wrapUp}),
+  });
+  const plan = await write({openingText:scene.text, scenes:[{...closing,text:'이전 디테일'},middle], closing});
+  assert.deepEqual(plan.scenes, [scene,middle,{...closing, text:closing.text + ' ' + wrapUp}]);
+  await assert.rejects(write({openingText:scene.text, scenes:[middle], closing:null}), /마무리/);
+});
+
+test('집필이 실패하면 저장해 둔 첫 장면부터 이어서 집필한다', async () => {
   let cachedOpening;
   const request = async () => cachedOpening ? new Response(null, {status:429}) : completion({candidates:[opening]});
   await assert.rejects(createDeepSeekPlan('바비큐', '', [photo], {
@@ -54,9 +84,47 @@ test('집필이 실패하면 저장해 둔 첫 장면으로 집필만 재시도�
   }), /429/);
   assert.deepEqual(cachedOpening, opening);
   const plan = await createDeepSeekPlan('바비큐', '', [photo], {
-    apiKey:'test', cachedOpening, onOpening:assert.fail, request:async () => completion({openingText:scene.text, scenes:[]}),
+    apiKey:'test', cachedOpening, onOpening:assert.fail, request:writerAndReviewer(singleSceneDraft, {wrapUp}),
   });
-  assert.deepEqual(plan, {title:opening.title, scenes:[scene]});
+  assert.deepEqual(plan, {title:opening.title, scenes:[singleScene]});
+});
+
+test('마무리 요청 실패 후 이미 작성한 대본을 그대로 사용해 마무리만 재시도한다', async () => {
+  let cachedDraft;
+  await assert.rejects(createDeepSeekPlan('바비큐', '', [photo], {
+    apiKey:'test', cachedOpening:opening, onDraft:value => { cachedDraft = value; },
+    request:async () => cachedDraft ? new Response(null,{status:429}) : completion(singleSceneDraft),
+  }), /429/);
+  assert.deepEqual(cachedDraft, singleSceneDraft);
+  let calls = 0;
+  const plan = await createDeepSeekPlan('바비큐', '', [photo], {
+    apiKey:'test', cachedOpening:opening, cachedDraft, onOpening:assert.fail, onDraft:assert.fail,
+    request:async (_url, options) => {
+      calls++;
+      assert.deepEqual(JSON.parse(JSON.parse(options.body).messages[1].content), {title:opening.title, scenes:[scene]});
+      return completion({wrapUp});
+    },
+  });
+  assert.equal(calls, 1);
+  assert.deepEqual(plan.scenes, [singleScene]);
+});
+
+test('마지막 경험담 뒤에 별도의 끝맺음이 정확히 한 번 들어간다', async () => {
+  const detail = '줄은 길었는데, 포장된 오니기리라 제 차례는 금방 왔어요.';
+  const invitation = '대구 신세계에서 간단히 한 끼 챙기고 싶다면 오니기리 한번 드셔 보세요.';
+  const write = (text, wrapUp) => createDeepSeekPlan('교토 오니마루', '', [photo, {lines:[detail]}], {
+    apiKey:'test', cachedOpening:opening, request:writerAndReviewer({
+      openingText:scene.text, scenes:[], closing:{photo:2, evidence:detail, text},
+    }, {wrapUp}),
+  });
+  const expected = detail + ' ' + invitation;
+  for (const text of [detail, detail.slice(0,-1), expected]) {
+    const plan = await write(text, invitation);
+    assert.equal(plan.scenes.length, 2);
+    assert.equal(plan.scenes.at(-1).text, expected);
+  }
+  await assert.rejects(write(detail, undefined), /끝맺음/);
+  await assert.rejects(write(detail, detail.slice(0,-1)), /반복/);
 });
 
 test('제목의 형식만 어긋나면 추가 요청 없이 유효한 장면과 제목을 사용한다', async () => {
@@ -74,16 +142,15 @@ test('제목의 형식만 어긋나면 추가 요청 없이 유효한 장면과 
   const segments = new Intl.Segmenter('ko', {granularity:'grapheme'});
   for (const [title, expected] of inputs) {
     let calls = 0;
-    const request = async () => ++calls === 1
-      ? completion({candidates:[{...opening, title}]})
-      : completion({openingText:scene.text, scenes:[]});
+    const replies = [{candidates:[{...opening, title}]}, singleSceneDraft, {wrapUp}];
+    const request = async () => completion(replies[calls++]);
     const plan = await createDeepSeekPlan(article, '', [photo], {apiKey:'test', request});
     const lines = plan.title.split('\n');
-    assert.equal(calls, 2);
+    assert.equal(calls, 3);
     assert.equal(lines.length, 2);
     assert.ok(lines.every(line => line && [...segments.segment(line)].length <= 15));
     assert.equal(expected.includes('\n') ? plan.title : lines.join(' '), expected);
-    assert.deepEqual(plan.scenes, [scene]);
+    assert.deepEqual(plan.scenes, [singleScene]);
   }
 });
 

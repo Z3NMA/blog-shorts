@@ -4,6 +4,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createDeepSeekPlan} from './deepseek-planner.mjs';
+import {parseBlogPost} from './blog-post.mjs';
 
 import {templates, sceneAss, sceneArgs} from './video-templates.mjs';
 
@@ -38,8 +39,6 @@ async function download(address) {
   if (!response.ok) throw Error(response.status + ' ' + address);
   return Buffer.from(await response.arrayBuffer());
 }
-const clean = s => s.replace(/<[^>]+>/g,' ').replace(/&nbsp;|&#160;/g,' ')
-  .replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/[\u200b\ufeff]/g,'').replace(/\s+/g,' ').trim();
 function save(name, data) {
   writeFileSync(local(name + '.tmp'), data);
   renameSync(local(name + '.tmp'), local(name));
@@ -48,21 +47,11 @@ const cachedPost = session && existsSync(local('post.html'));
 const html = cachedPost ? readFileSync(local('post.html'), 'utf8') :
   process.env.POST_HTML ? readFileSync(process.env.POST_HTML,'utf8') : (await download(mobile)).toString('utf8');
 if (session && !cachedPost && html.includes('se-image-resource')) save('post.html', html);
-const title = clean(html.match(/<meta property="og:title" content="([^"]*)"/)?.[1] || '블로그 이야기');
-const photos = [];
-const introduction = [];
-for (const m of html.matchAll(/<img\b[^>]*se-image-resource[^>]*>|<p\b[^>]*se-text-paragraph[^>]*>[\s\S]*?<\/p>/g)) {
-  if (m[0].startsWith('<img')) {
-    const src = (m[0].match(/data-lazy-src="([^"]+)"/) || m[0].match(/src="([^"]+)"/))?.[1];
-    if (src) photos.push({src:clean(src),lines:[]});
-  } else {
-    const lines = photos.length ? photos.at(-1).lines : introduction;
-    lines.push(clean(m[0]));
-  }
-}
+const {title, introduction, photos} = parseBlogPost(html);
 function autoPlan() {
   const choices = [];
   for (const [i,photo] of photos.entries()) {
+    if (photo.isCover) continue;
     const sentences = photo.lines.flatMap(line => line.split(/(?<=[.!?])\s+/));
     const text = sentences.find(s => s.length >= 13 && s.length <= 90 && /[요다죠네][.!?~ ]*$/.test(s));
     if (text && !choices.some(c => c.text === text)) choices.push({photo:i+1,text});
@@ -81,10 +70,12 @@ if (session && existsSync(local('plan.json'))) {
   plan = JSON.parse(readFileSync(scriptFile,'utf8'));
 } else if (process.env.SHORTS_PLANNER === 'deepseek') {
   console.log('DeepSeek에서 대본과 사진 순서를 구성하고 있습니다.');
-  const hasOpening = session && existsSync(local('opening.json'));
+  const cachedStep = name => session && existsSync(local(name)) ? JSON.parse(readFileSync(local(name), 'utf8')) : undefined;
   plan = await createDeepSeekPlan(title, introduction.join(' '), photos, {
-    cachedOpening:hasOpening ? JSON.parse(readFileSync(local('opening.json'), 'utf8')) : undefined,
+    cachedOpening:cachedStep('opening.json'),
     onOpening:session ? opening => save('opening.json', JSON.stringify(opening)) : undefined,
+    cachedDraft:cachedStep('draft.json'),
+    onDraft:session ? draft => save('draft.json', JSON.stringify(draft)) : undefined,
   });
 } else {
   plan = autoPlan();

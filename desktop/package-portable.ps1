@@ -17,7 +17,7 @@ Copy-Item -LiteralPath $Executable -Destination (Join-Path $stage 'blog-shorts.e
 foreach ($item in 'node.exe', 'ffmpeg.exe', 'WebView2Loader.dll', 'notices') {
     Copy-Item -LiteralPath (Join-Path $RuntimeDirectory $item) -Destination $stage -Recurse
 }
-foreach ($module in 'shorts.mjs', 'video-templates.mjs', 'deepseek-planner.mjs', 'deepseek-voice.mjs', 'gemini-voice.mjs', 'voice_ai.py', 'voice.ps1') {
+foreach ($module in 'shorts.mjs', 'blog-post.mjs', 'video-templates.mjs', 'deepseek-planner.mjs', 'deepseek-voice.mjs', 'gemini-voice.mjs', 'voice_ai.py', 'voice.ps1') {
     Copy-Item -LiteralPath (Join-Path "$PSScriptRoot/.." $module) -Destination $engine.FullName
 }
 Copy-Item -LiteralPath (Join-Path "$PSScriptRoot/.." 'fonts') -Destination $engine.FullName -Recurse

@@ -42,6 +42,7 @@ test('Gemini sends the exact caption text per scene and saves Google WAV output'
       assert.match(style, /10% faster than everyday conversation/i);
       assert.match(style, /brief pause where the meaning changes/i);
       assert.match(style, /sentence endings.*short and relaxed/i);
+      assert.equal(style.includes('gentle downward cadence'), sent.length === scenes.length - 1);
       sent.push(turn.text);
       return Response.json({steps: [{type: 'model_output', content: [
         {type: 'audio', data: wav.toString('base64')},

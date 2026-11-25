@@ -23,6 +23,9 @@ export async function synthesizeGeminiScenes(scenes, directory, {
     })) continue;
     if (!apiKey?.trim()) throw Error('Google AI Studio에서 발급한 Gemini API 키를 입력하세요.');
     const label = `Gemini 음성 · ${index + 1}/${scenes.length}장면`;
+    const style = index === scenes.length - 1
+      ? narrationStyle + ' On this final line, let the last phrase resolve with a gentle downward cadence and a clean, short ending.'
+      : narrationStyle;
     console.log(label);
     const response = await request('https://generativelanguage.googleapis.com/v1beta/interactions', {
       method: 'POST',
@@ -33,7 +36,7 @@ export async function synthesizeGeminiScenes(scenes, directory, {
         model: 'gemini-3.8-flash-tts',
         input: [{type: 'user_input', content: [{
           type: 'text', text: scene.text,
-          annotations: [{type: 'speech_metadata', style: narrationStyle}],
+          annotations: [{type: 'speech_metadata', style}],
         }]}],
         response_format: {type: 'audio'},
         generation_config: {speech_config: [{voice: narratorVoice}]},

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -53,4 +53,55 @@ test('첫 사진 교체는 대사를 보존하고, 손상된 마지막 사진은
     success(worker('apply',{ending:'따뜻한 식사를 찾으시면 들러 보세요.'}));
     assert.equal(await readFile(file('0.wav'),'utf8'),'cached');
     for (const name of ['1.wav','voice.ready']) await assert.rejects(readFile(file(name)),{code:'ENOENT'});
+  });
+
+test('같은 글의 두 이야기는 사진을 공유하고 편집된 장면 음성만 폐기한다',
+  {skip:available ? false : 'FFmpeg가 필요합니다.'}, async t => {
+    const root = await mkdtemp(path.join(tmpdir(),'shorts-stories-'));
+    t.after(() => rm(root,{recursive:true,force:true}));
+    const common = name => path.join(root, name);
+    const local = (id,name) => common(path.join('story-' + id,name));
+    const photos = [1,2,3];
+    const paragraphs = ['빵을 구웠어요.','고기를 올렸어요.','둘이 나눴어요.'];
+    const scenes = photos.map((photo,i) => ({photo,text:paragraphs[i],evidence:paragraphs[i]}));
+    await writeFile(common('post.html'),photos.map((n,i) =>
+      '<img class="se-image-resource" src="https://example.com/'+n+'.jpg"><p class="se-text-paragraph">'+paragraphs[i]+'</p>').join(''));
+    await writeFile(common('openings.json'),JSON.stringify(scenes.slice(0,2).map((scene,i) =>
+      ({title:'이야기 '+i,photo:scene.photo,evidence:scene.evidence}))));
+    for (const n of photos) await writeFile(common(n + '.jpg'),Buffer.concat([Buffer.from('P6\n8 8\n255\n'),Buffer.alloc(192,50*n)]));
+    for (const id of [0,1]) {
+      await mkdir(common('story-' + id));
+      await writeFile(local(id,'plan.json'),JSON.stringify({title:'이야기 '+id,scenes}));
+      for (const file of ['voice.ready','0.wav','1.wav','2.wav']) await writeFile(local(id,file),'cached');
+    }
+    function worker(action,id,edit={}) {
+      const dir = id == null ? root : common('story-' + id);
+      return spawnSync(process.execPath,[engine,'https://blog.naver.com/test/123','-'],{
+        env:{...process.env,FFMPEG:ffmpeg,SHORTS_SESSION:dir,SHORTS_SOURCE_DIR:root,SHORTS_STORY:String(id),
+          PHOTO_DIR:root,SHORTS_ACTION:action,SHORTS_EDIT:JSON.stringify(edit),DEEPSEEK_API_KEY:''},
+        windowsHide:true,encoding:'utf8',
+      });
+    }
+    const ok = result => assert.equal(result.status,0,result.stderr);
+    ok(worker('stories'));
+    const {candidates} = JSON.parse(await readFile(common('stories.json'),'utf8'));
+    assert.deepEqual(candidates.map(c => [c.id,c.hasPlan,Boolean(c.image)]),[[0,true,true],[1,true,true]]);
+    ok(worker('story',1));
+    const board = JSON.parse(await readFile(local(1,'board.json'),'utf8'));
+    assert.deepEqual(board.scenes.map(s => s.text),paragraphs);
+    assert.deepEqual(board.scenes[1].context,paragraphs.slice(0,2));
+    const edits = {scenes:scenes.map(s => ({photo:s.photo,text:s.text}))};
+    edits.scenes[0].photo = 2;
+    edits.scenes[1].text = '빵 위에 고기를 올려요.';
+    ok(worker('apply',1,edits));
+    const revised = JSON.parse(await readFile(local(1,'plan.json'),'utf8'));
+    assert.equal(revised.scenes[0].evidencePhoto,1);
+    assert.equal(revised.scenes[1].text,edits.scenes[1].text);
+    for (const file of ['1.wav','voice.ready']) await assert.rejects(readFile(local(1,file)),{code:'ENOENT'});
+    for (const file of ['0.wav','2.wav']) assert.equal(await readFile(local(1,file),'utf8'),'cached');
+    assert.deepEqual(JSON.parse(await readFile(local(0,'plan.json'),'utf8')).scenes,scenes);
+    assert.equal(await readFile(local(0,'voice.ready'),'utf8'),'cached');
+    edits.scenes[2].text = '모든 메뉴가 무료예요.';
+    assert.match(worker('apply',1,edits).stderr,/3번째 장면/);
+    assert.deepEqual(JSON.parse(await readFile(local(1,'plan.json'),'utf8')),revised);
   });

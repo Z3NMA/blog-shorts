@@ -3,14 +3,15 @@ import {existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, copyFil
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {createDeepSeekPlan, setReviewEnding, suggestReviewEnding} from './deepseek-planner.mjs';
+import {createDeepSeekPlan, proposeStories, suggestReviewEnding} from './deepseek-planner.mjs';
+import {editScenes, sceneSources, sourceLines} from './scene-editor.mjs';
 import {parseBlogPost} from './blog-post.mjs';
 
 import {templates, sceneAss, sceneArgs} from './video-templates.mjs';
 
 const session = process.env.SHORTS_SESSION;
 const action = session ? process.env.SHORTS_ACTION : undefined;
-const prepare = ['prepare','photos','ending','apply'].includes(action);
+const prepare = ['stories','story','prepare','photos','ending','apply'].includes(action);
 const [source, output = 'shorts.mp4', scriptFile] = process.argv.slice(2);
 if (!source) throw Error('node shorts.mjs NAVER_URL [OUTPUT.mp4] [SCRIPT.json]');
 if (!prepare && existsSync(output)) throw Error('Output already exists: ' + output);
@@ -21,6 +22,7 @@ if (!post || !['blog.naver.com','m.blog.naver.com'].includes(url.hostname))
 const mobile = 'https://m.blog.naver.com/' + post[1] + '/' + post[2];
 const dir = session || mkdtempSync(path.join(tmpdir(), 'blog-shorts-'));
 const local = name => path.join(dir, name);
+const shared = name => path.join(session && process.env.SHORTS_SOURCE_DIR || dir, name);
 const ffmpeg = process.env.FFMPEG || 'ffmpeg';
 // Relative filter paths work even when the portable application path contains a drive letter or spaces.
 mkdirSync(local('fonts'), {recursive:true});
@@ -40,15 +42,31 @@ async function download(address) {
   if (!response.ok) throw Error(response.status + ' ' + address);
   return Buffer.from(await response.arrayBuffer());
 }
-function save(name, data) {
-  writeFileSync(local(name + '.tmp'), data);
-  renameSync(local(name + '.tmp'), local(name));
+function saveFile(file, data) {
+  writeFileSync(file + '.tmp', data);
+  renameSync(file + '.tmp', file);
 }
-const cachedPost = session && existsSync(local('post.html'));
-const html = cachedPost ? readFileSync(local('post.html'), 'utf8') :
+const save = (name, data) => saveFile(local(name), data);
+const readJson = file => JSON.parse(readFileSync(file, 'utf8'));
+const cachedPost = session && existsSync(shared('post.html'));
+const html = cachedPost ? readFileSync(shared('post.html'), 'utf8') :
   process.env.POST_HTML ? readFileSync(process.env.POST_HTML,'utf8') : (await download(mobile)).toString('utf8');
-if (session && !cachedPost && html.includes('se-image-resource')) save('post.html', html);
+if (session && !cachedPost && html.includes('se-image-resource')) saveFile(shared('post.html'), html);
 const {title, introduction, photos} = parseBlogPost(html);
+const edit = prepare ? JSON.parse(process.env.SHORTS_EDIT || '{}') : {};
+const jpeg = file => 'data:image/jpeg;base64,' + readFileSync(file).toString('base64');
+if (action === 'stories') {
+  const file = shared('openings.json');
+  const openings = existsSync(file) ? readJson(file) : await proposeStories(title, introduction.join(' '), photos);
+  if (!existsSync(file)) saveFile(file, JSON.stringify(openings));
+  const candidates = [];
+  for (const [id, opening] of openings.entries()) {
+    candidates.push({...opening, id, image:await thumbnail(opening.photo),
+      hasPlan:existsSync(shared('story-' + id + '/plan.json'))});
+  }
+  save('stories.json', JSON.stringify({articleTitle:title, candidates}));
+  process.exit(0);
+}
 function autoPlan() {
   const choices = [];
   for (const [i,photo] of photos.entries()) {
@@ -66,15 +84,21 @@ let plan;
 const savedPlan = session && existsSync(local('plan.json'));
 if (savedPlan) {
   plan = JSON.parse(readFileSync(local('plan.json'), 'utf8'));
-} else if (session && action !== 'prepare') {
+} else if (session && action !== 'prepare' && action !== 'story') {
   throw Error('블로그 글을 먼저 확인하세요.');
 } else if (scriptFile) {
   plan = JSON.parse(readFileSync(scriptFile,'utf8'));
 } else if (process.env.SHORTS_PLANNER === 'deepseek') {
   console.log('DeepSeek에서 대본과 사진 순서를 구성하고 있습니다.');
   const cachedStep = name => session && existsSync(local(name)) ? JSON.parse(readFileSync(local(name), 'utf8')) : undefined;
+  let opening;
+  if (action === 'story') {
+    const id = process.env.SHORTS_STORY;
+    opening = /^[0-2]$/u.test(id) && readJson(shared('openings.json'))[Number(id)];
+    if (!opening) throw Error('목록에서 이야기를 다시 선택하세요.');
+  }
   plan = await createDeepSeekPlan(title, introduction.join(' '), photos, {
-    cachedOpening:cachedStep('opening.json'),
+    selectedOpening:opening, cachedOpening:cachedStep('opening.json'),
     onOpening:session ? opening => save('opening.json', JSON.stringify(opening)) : undefined,
     cachedDraft:cachedStep('draft.json'),
     onDraft:session ? draft => save('draft.json', JSON.stringify(draft)) : undefined,
@@ -104,15 +128,15 @@ console.log('Photos:',photos.length,'Scenes:',plan.scenes.length,'Working files:
 if (!savedPlan) save('plan.json',JSON.stringify(plan,null,2));
 async function scenePhoto(scene) {
   const name = 'photo-' + scene.photo;
-  if (!existsSync(local(name))) {
+  if (!existsSync(shared(name))) {
     const cached = process.env.PHOTO_DIR && path.resolve(process.env.PHOTO_DIR, scene.photo + '.jpg');
-    if (cached) copyFileSync(cached, local(name));
-    else save(name, await download(photos[scene.photo - 1].src));
+    if (cached) copyFileSync(cached, shared(name));
+    else saveFile(shared(name), await download(photos[scene.photo - 1].src));
   }
-  return local(name);
+  return shared(name);
 }
 async function checkedPhoto(scene, index) {
-  const file = local('photo-' + scene.photo);
+  const file = shared('photo-' + scene.photo);
   const cached = existsSync(file);
   const decode = async () => {
     await scenePhoto(scene);
@@ -132,54 +156,59 @@ async function checkedPhoto(scene, index) {
   }
   return file;
 }
+async function thumbnail(number) {
+  const file = shared('thumb-' + number + '.jpg');
+  try {
+    if (!existsSync(file)) {
+      const photo = await scenePhoto({photo:number});
+      const temp = file + '.tmp.jpg';
+      run(ffmpeg, ['-v','error','-xerror','-y','-i',photo,'-frames:v','1','-vf',
+        'scale=320:240:force_original_aspect_ratio=decrease','-q:v','4',temp]);
+      renameSync(temp, file);
+    }
+    return jpeg(file);
+  } catch {
+    rmSync(shared('photo-' + number), {force:true});
+    return null;
+  }
+}
+
+async function photoCard(number) {
+  return {photo:number, image:await thumbnail(number), context:sourceLines(photos, introduction, number)};
+}
+
 if (prepare) {
-  const first = plan.scenes[0];
-  const edit = JSON.parse(process.env.SHORTS_EDIT || '{}');
-  const priceSources = plan.scenes.flatMap(scene => {
-    const n = scene.evidencePhoto ?? scene.photo;
-    return [...(photos[n-2]?.lines ?? introduction), ...photos[n-1].lines];
-  });
-  const jpeg = file => 'data:image/jpeg;base64,' + readFileSync(file).toString('base64');
+  if (action === 'story') {
+    const scenes = [];
+    for (const [i, scene] of plan.scenes.entries()) {
+      scenes.push({...await photoCard(scene.photo), evidence:scene.evidence,
+        evidencePhoto:scene.evidencePhoto ?? scene.photo,
+        text:i === plan.scenes.length - 1 && plan.ending ? plan.ending.body : scene.text});
+    }
+    save('board.json', JSON.stringify({title:plan.title, articleTitle:title, scenes, ending:plan.ending}));
+    process.exit(0);
+  }
   if (action === 'photos') {
     const numbers = photos.flatMap((photo,i) => photo.isCover ? [] : [i+1]);
     const offset = edit.offset ?? 0;
     if (!Number.isInteger(offset) || offset < 0) throw Error('사진 목록을 다시 여세요.');
     const choices = [];
     for (const number of numbers.slice(offset, offset + 8)) {
-      const thumb = local('thumb-' + number + '.jpg');
-      let image = null;
-      try {
-        if (!existsSync(thumb)) {
-          const photo = await scenePhoto({photo:number});
-          const temp = thumb + '.tmp.jpg';
-          run(ffmpeg, ['-v','error','-xerror','-y','-i',photo,'-frames:v','1','-vf','scale=160:160:force_original_aspect_ratio=decrease','-q:v','5',temp]);
-          renameSync(temp, thumb);
-        }
-        image = jpeg(thumb);
-      } catch {
-        rmSync(local('photo-' + number), {force:true});
-      }
-      choices.push({photo:number, image, used:plan.scenes.slice(1).some(s => s.photo === number)});
+      choices.push(await photoCard(number));
     }
     save('choices.json',JSON.stringify({choices,total:numbers.length}));
     process.exit(0);
   }
   if (action === 'ending') {
-    const text = await suggestReviewEnding(plan, {previous:edit.ending || plan.ending?.text, priceSources});
+    const current = editScenes(plan, edit, photos, introduction, {suggesting:true});
+    const priceSources = current.scenes.flatMap(scene => sceneSources(scene, photos, introduction));
+    const text = await suggestReviewEnding(current, {previous:edit.ending || plan.ending?.text, priceSources});
     save('suggestion.json',JSON.stringify({text}));
     process.exit(0);
   }
-  const lastText = plan.scenes.at(-1).text;
-  if (action === 'apply') {
-    if (edit.photo != null && edit.photo !== first.photo) {
-      if (!Number.isInteger(edit.photo) || !photos[edit.photo-1] || photos[edit.photo-1].isCover)
-        throw Error('블로그 본문에 있는 첫 사진을 선택하세요.');
-      first.evidencePhoto ??= first.photo;
-      first.photo = edit.photo;
-      if (first.photo === first.evidencePhoto) delete first.evidencePhoto;
-    }
-    if (edit.ending != null) setReviewEnding(plan, edit.ending, priceSources);
-  }
+  const original = plan;
+  if (action === 'apply') plan = editScenes(original, edit, photos, introduction);
+  const first = plan.scenes[0];
   const previous = existsSync(local('preview.json')) ? JSON.parse(readFileSync(local('preview.json'),'utf8')) : {};
   let styles = previous.styles;
   if (!styles || first.photo !== previous.photo || first.text !== previous.firstText || plan.title !== previous.title) {
@@ -194,9 +223,11 @@ if (prepare) {
     }
   }
   if (action === 'apply') {
-    if (lastText !== plan.scenes.at(-1).text) {
-      rmSync(local('voice.ready'), {force:true});
-      rmSync(local((plan.scenes.length-1) + '.wav'), {force:true});
+    for (const [index, scene] of plan.scenes.entries()) {
+      if (scene.text !== original.scenes[index].text) {
+        rmSync(local('voice.ready'), {force:true});
+        rmSync(local(index + '.wav'), {force:true});
+      }
     }
     save('plan.json',JSON.stringify(plan,null,2));
   }

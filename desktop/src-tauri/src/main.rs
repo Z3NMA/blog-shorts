@@ -27,6 +27,13 @@ struct Project {
     dir: PathBuf,
 }
 
+impl Project {
+    fn story_dir(&self, story: Option<u8>) -> Result<PathBuf, String> {
+        let id = story.filter(|id| *id < 3).ok_or("이야기를 다시 선택하세요.")?;
+        Ok(self.dir.join(format!("story-{id}")))
+    }
+}
+
 impl Drop for Project {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.dir);
@@ -54,6 +61,7 @@ struct Job {
     template: String,
     #[serde(default)]
     operation: String,
+    story: Option<u8>,
     #[serde(default)]
     edit: String,
     output_folder: String,
@@ -199,7 +207,7 @@ fn stamp() -> Result<u128, String> {
         .map_err(|e| e.to_string())
 }
 
-fn engine(app: &AppHandle, project: &Project) -> Result<Command, String> {
+fn engine(app: &AppHandle, project: &Project, workspace: &Path) -> Result<Command, String> {
     let script = app
         .path()
         .resource_dir()
@@ -228,7 +236,9 @@ fn engine(app: &AppHandle, project: &Project) -> Result<Command, String> {
     worker
         .arg(script)
         .arg(&project.url)
-        .env("SHORTS_SESSION", &project.dir)
+        .env("SHORTS_SESSION", workspace)
+        .env("SHORTS_SOURCE_DIR", &project.dir)
+        .env_remove("SHORTS_STORY")
         .env("FFMPEG", ffmpeg)
         .env("SHORTS_PLANNER", "deepseek")
         .env("SHORTS_VOICE", "gemini")
@@ -288,11 +298,11 @@ fn preview_project(app: &AppHandle, job: Job) -> Result<Preview, String> {
     let state = app.state::<Studio>();
     let mut slot = state.project.lock().map_err(|e| e.to_string())?;
     let action = match job.operation.as_str() {
-        "" => "prepare",
-        "photos" | "ending" | "apply" => job.operation.as_str(),
+        "" | "stories" => "stories",
+        "story" | "photos" | "ending" | "apply" => job.operation.as_str(),
         _ => return Err("편집 작업을 확인하세요.".into()),
     };
-    if action != "prepare" && !slot.as_ref().is_some_and(|p| p.url == url && p.token == job.token) {
+    if action != "stories" && !slot.as_ref().is_some_and(|p| p.url == url && p.token == job.token) {
         return Err("현재 글의 미리보기를 다시 확인하세요.".into());
     }
     if slot.as_ref().map(|p| &p.url) != Some(&url) {
@@ -302,21 +312,27 @@ fn preview_project(app: &AppHandle, job: Job) -> Result<Preview, String> {
         *slot = Some(Project { url, token, dir });
     }
     let project = slot.as_ref().ok_or("글을 다시 확인하세요.")?;
-    let manifest = project.dir.join(match action {
+    let workspace = if action == "stories" {
+        project.dir.clone()
+    } else {
+        project.story_dir(job.story)?
+    };
+    fs::create_dir_all(&workspace).map_err(|e| e.to_string())?;
+    let manifest = workspace.join(match action {
+        "stories" => "stories.json",
+        "story" => "board.json",
         "photos" => "choices.json",
         "ending" => "suggestion.json",
         _ => "preview.json",
     });
     let secret = key(&job.api_key, "DEEPSEEK_API_KEY");
-    if secret.is_empty() && !project.dir.join("plan.json").is_file() {
-        return Err("대본 생성에 사용할 DeepSeek API 키를 입력하세요.".into());
-    }
-    let mut worker = engine(app, project)?;
+    let mut worker = engine(app, project, &workspace)?;
+    if let Some(id) = job.story { worker.env("SHORTS_STORY", id.to_string()); }
     worker.arg("-").env("SHORTS_ACTION", action).env("DEEPSEEK_API_KEY", &secret);
     if !job.edit.is_empty() { worker.env("SHORTS_EDIT", &job.edit); }
     execute(app, &mut worker, &secret)?;
     Ok(Preview {
-        audio_ready: project.dir.join("voice.ready").is_file(),
+        audio_ready: workspace.join("voice.ready").is_file(),
         token: project.token.clone(),
         manifest: fs::read_to_string(manifest).map_err(|e| e.to_string())?,
     })
@@ -328,10 +344,14 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
     let slot = state.project.lock().map_err(|e| e.to_string())?;
     let project = slot
         .as_ref()
-        .filter(|p| p.token == job.token && p.url == url && p.dir.join("preview.json").is_file())
+        .filter(|p| p.token == job.token && p.url == url)
         .ok_or("현재 글의 미리보기를 다시 확인하세요.")?;
+    let workspace = project.story_dir(job.story)?;
+    if !workspace.join("preview.json").is_file() {
+        return Err("선택한 이야기의 장면 검토를 마쳐 주세요.".into());
+    }
     let secret = key(&job.gemini_key, "GEMINI_API_KEY");
-    if secret.is_empty() && !project.dir.join("voice.ready").is_file() {
+    if secret.is_empty() && !workspace.join("voice.ready").is_file() {
         return Err("Gemini API 키를 입력하세요.".into());
     }
     let folder = PathBuf::from(job.output_folder.trim());
@@ -356,7 +376,7 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
     drop(file_test);
     fs::remove_file(&probe).map_err(|e| format!("저장 폴더를 사용할 수 없습니다. {e}"))?;
 
-    let mut worker = engine(app, project)?;
+    let mut worker = engine(app, project, &workspace)?;
     worker
         .arg(&partial)
         .env("SHORTS_ACTION", "render")

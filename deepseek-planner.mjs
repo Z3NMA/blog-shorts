@@ -13,7 +13,7 @@ const editorPrompt = `네이버 블로그 한 편으로 만들 한국어 숏츠�
 JSON 형식: {"candidates":[{"title":"대상 이름\\n구체적인 특징","photo":1,"evidence":"첫 장면을 뒷받침하는 원문 구절"}]}`;
 
 const writerPrompt = `선정된 opening과 블로그 원문으로 한국어 숏츠 대사를 씁니다. ${sourceRules}
-openingText는 지정된 첫 사진의 대사입니다. 제목을 읽어 주는 대신 opening.evidence에서 제목이 궁금하게 만든 내용을 첫마디부터 풀어 주세요.
+opening은 제작자가 선택한 이야기입니다. 첫 대사부터 중간의 경험과 마지막 팁까지 이 관점에 맞는 장면을 고르세요. openingText는 지정된 첫 사진의 대사입니다. 제목을 읽어 주는 대신 opening.evidence에서 제목이 궁금하게 만든 내용을 첫마디부터 풀어 주세요.
 이어지는 scenes에서는 사진 주변 글에 있는 경험, 이유, 이용 방법을 하나씩 들려주세요. 첫 사진을 포함해 같은 사진을 두 번 쓰지 마세요. 앞 장면의 말을 반복하지 말고 이야기 흐름에 맞게 순서를 정하세요. 가격·주소·운영시간·후기는 원문에 있는 사실만 쓰세요.
 처음 듣는 한 사람에게 설명하듯 쉬운 해요체로 쓰세요. 한 호흡에 한 가지 사실을 담고, 입으로 읽었을 때 자연스럽게 이어지도록 군더더기와 잦은 쉼표를 덜어 주세요. 도입 인사, 과장된 감탄, 구매 권유는 생략하세요. 대사는 자막으로도 그대로 씁니다.
 마지막 사진에서 들려줄 구체적인 경험이나 팁은 closing.text에 쓰세요. 그 사진 주변의 원문 구절을 근거로 삼으세요. 첫 사진과 다른 마지막 사진을 고르고 중간 scenes에서는 제외하세요.
@@ -90,8 +90,9 @@ function hasEvidence(photo, quote) {
   return photo && (photo.before.includes(quote) || photo.after.includes(quote));
 }
 
-function selectOpening(candidates, source, originalLines) {
-  if (!Array.isArray(candidates)) return;
+function verifiedOpenings(candidates, source, originalLines) {
+  const openings = [];
+  if (!Array.isArray(candidates)) return openings;
   for (const candidate of candidates) {
     const photo = source.photos.find(p => p.photo === candidate?.photo);
     const quote = typeof candidate?.evidence === 'string' ? candidate.evidence.trim() : '';
@@ -99,9 +100,12 @@ function selectOpening(candidates, source, originalLines) {
       const title = formatHeadline(candidate.title, source.title);
       try { verifyPrices(title, [source.title, ...originalLines(photo.photo)]); }
       catch (error) { if (error instanceof PriceMismatch) continue; throw error; }
-      return {title, photo:photo.photo, evidence:quote};
+      if (openings.some(item => item.title === title)) continue;
+      openings.push({title, photo:photo.photo, evidence:quote});
+      if (openings.length === 3) break;
     }
   }
+  return openings;
 }
 
 function checkPlan(draft, opening, source) {
@@ -184,18 +188,29 @@ export async function suggestReviewEnding(plan, {apiKey = process.env.DEEPSEEK_A
   return proposed.ending.text;
 }
 
+export async function proposeStories(title, intro, photos, {
+  apiKey = process.env.DEEPSEEK_API_KEY, request = fetch,
+} = {}) {
+  if (!apiKey?.trim()) throw Error('DeepSeek API 키를 입력하세요.');
+  const source = collectSource(title, intro, photos);
+  const proposals = await requestDraft(editorPrompt, source, apiKey, request);
+  const choices = verifiedOpenings(proposals?.candidates, source, number =>
+    [...(photos[number-2]?.lines || [intro]), ...photos[number-1].lines]);
+  if (!choices.length) throw Error('DeepSeek 제목 후보에서 첫 사진 번호·제목과 일치하는 원문 근거를 찾지 못했습니다.');
+  return choices;
+}
+
 export async function createDeepSeekPlan(title, intro, photos, {
-  apiKey = process.env.DEEPSEEK_API_KEY, request = fetch, cachedOpening, onOpening, cachedDraft, onDraft,
+  apiKey = process.env.DEEPSEEK_API_KEY, request = fetch, cachedOpening, selectedOpening, onOpening, cachedDraft, onDraft,
 } = {}) {
   if (!apiKey?.trim()) throw Error('DeepSeek API 키를 입력하세요.');
   const source = collectSource(title, intro, photos);
   const originalLines = number => [...(photos[number-2]?.lines || [intro]), ...photos[number-1].lines];
-  let opening = selectOpening([cachedOpening], source, originalLines);
+  let [opening] = verifiedOpenings([selectedOpening ?? cachedOpening], source, originalLines);
   const savedDraft = opening ? cachedDraft : undefined;
   if (!opening) {
-    const proposals = await requestDraft(editorPrompt, source, apiKey, request);
-    opening = selectOpening(proposals?.candidates, source, originalLines);
-    if (!opening) throw Error('DeepSeek 제목 후보에서 첫 사진 번호·제목과 일치하는 원문 근거를 찾지 못했습니다.');
+    if (selectedOpening) throw Error('선택한 이야기의 첫 사진과 원문 근거를 다시 확인하세요.');
+    [opening] = await proposeStories(title, intro, photos, {apiKey, request});
     await onOpening?.(opening);
   }
   const input = {...source, opening};

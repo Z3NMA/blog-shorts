@@ -10,25 +10,35 @@
       <div class="source"><label for="url">네이버 블로그 글 주소</label><div class="field">
         <input type="url" id="url" placeholder="https://blog.naver.com/아이디/글번호" spellcheck="false" required>
         <button id="confirm" type="button" class="primary confirm">확인</button></div>
-        <p class="input-note">새 글을 확인하면 대본 생성 요금이 발생합니다.</p>
+        <p class="input-note">새 글의 이야기 후보를 만들 때 DeepSeek를 호출합니다.</p>
       </div>
     </section>
     <div class="source-row" id="sourceRow" hidden><span class="naver" aria-hidden="true">N</span><strong id="article"></strong><button class="plain" id="edit" type="button">링크 변경</button></div>
+    <section id="stories" hidden aria-labelledby="storiesTitle">
+      <h2 id="storiesTitle" tabindex="-1">어떤 이야기로 시작할까요?</h2>
+      <p class="section-note">제목과 첫 사진을 고르면 그 관점으로 대본을 씁니다.</p>
+      <fieldset id="storyChoices" class="story-choices" aria-label="이야기 후보"></fieldset>
+      <div class="bottom"><button class="primary" id="writeStory" type="button">이 이야기로 대본 만들기</button></div>
+    </section>
+    <section id="review" hidden aria-labelledby="reviewTitle">
+      <div class="section-head"><h2 id="reviewTitle" tabindex="-1">장면 검토</h2><button class="plain" id="backStories" type="button">이야기 다시 고르기</button></div>
+      <div class="board-intro"><strong id="boardTitle"></strong><span id="sceneCount"></span></div>
+      <p class="section-note">각 사진 옆의 대사가 내레이션과 자막에 함께 쓰입니다.</p>
+      <ol id="scenes" class="scene-list"></ol>
+      <div id="photoPanel" hidden>
+        <div class="edit-head"><strong id="photoHeading"></strong><button id="closePhotos" class="plain" type="button">닫기</button></div>
+        <div class="photo-choices" id="photoChoices" role="group" aria-labelledby="photoHeading"></div>
+        <button id="retryPhotos" class="plain" type="button" hidden>실패한 사진 다시 불러오기</button>
+        <button id="morePhotos" class="plain" type="button">사진 더 보기</button>
+      </div>
+      <div class="bottom"><button class="primary" id="toStyles" type="button">편집 반영하고 스타일 선택</button></div>
+    </section>
     <section id="picker" hidden aria-label="영상 스타일 선택">
       <div class="section-head"><h2>영상 스타일</h2><button class="mode" id="mode" type="button" aria-controls="gallery" aria-expanded="false"><span aria-hidden="true">▦</span><span id="modeName">모두 보기</span></button></div>
       <div class="deck" id="deck" aria-label="좌우로 넘기는 첫 장면 미리보기"></div>
       <div class="tiles" id="gallery" role="group" aria-label="모든 스타일" hidden></div>
       <div class="controls" id="arrows"><button class="arrow" id="prev" type="button" aria-label="이전 스타일">‹</button><div class="which" role="status"><b id="styleName"></b><small id="count"></small></div><button class="arrow" id="next" type="button" aria-label="다음 스타일">›</button></div>
-      <div class="scene-editor">
-        <div class="edit-head"><h3>첫 사진</h3><button id="choosePhoto" class="plain" type="button" aria-expanded="false" aria-controls="photoPanel">사진 바꾸기</button></div>
-        <div id="photoPanel" hidden><p class="edit-note">첫 장면의 대사에 어울리는 본문 사진을 고르세요.</p>
-          <div class="photo-choices" id="photoChoices" role="group" aria-label="첫 사진 후보"></div>
-          <button id="morePhotos" class="plain" type="button" hidden>사진 더 보기</button></div>
-        <div class="edit-head ending-head"><label for="ending">마지막 멘트</label><button id="rewrite" type="button" class="plain" title="DeepSeek를 한 번 호출합니다">AI로 다시 쓰기</button></div>
-        <p class="edit-note" id="endingBody"></p>
-        <textarea id="ending" maxlength="90" rows="2" aria-describedby="endingBody" required></textarea>
-      </div>
-      <div class="bottom"><button class="primary" id="create" type="button">이 스타일로 제작</button></div>
+      <div class="bottom split"><button id="backReview" class="plain" type="button">장면 다시 편집</button><button class="primary" id="create" type="button">이 스타일로 제작</button></div>
     </section>
     <section id="finished" hidden aria-label="완성된 영상"><div class="result-body">
       <video id="player" controls playsinline preload="metadata" aria-label="완성된 숏츠"></video>

@@ -58,6 +58,6 @@ test('missing keys, denied requests, and missing audio fail before rendering', a
   const scenes = [{text: '안녕하세요.'}];
   const run = options => synthesizeGeminiScenes(scenes, '.', options);
   await assert.rejects(run({apiKey: '', request: assert.fail}), /API 키/);
-  await assert.rejects(run({apiKey: 'test', request: () => new Response(null, {status: 429})}), /429/);
+  await assert.rejects(run({apiKey: 'test', sleep:async () => {}, request: () => new Response(null, {status: 429})}), /429/);
   await assert.rejects(run({apiKey: 'test', request: () => Response.json({steps: []})}), /WAV/);
 });

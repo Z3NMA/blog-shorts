@@ -1,15 +1,16 @@
 import {spawnSync} from 'node:child_process';
-import {existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, copyFileSync, renameSync} from 'node:fs';
+import {existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, copyFileSync, renameSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {createDeepSeekPlan} from './deepseek-planner.mjs';
+import {createDeepSeekPlan, setReviewEnding, suggestReviewEnding} from './deepseek-planner.mjs';
 import {parseBlogPost} from './blog-post.mjs';
 
 import {templates, sceneAss, sceneArgs} from './video-templates.mjs';
 
 const session = process.env.SHORTS_SESSION;
-const prepare = process.env.SHORTS_ACTION === 'prepare' && Boolean(session);
+const action = session ? process.env.SHORTS_ACTION : undefined;
+const prepare = ['prepare','photos','ending','apply'].includes(action);
 const [source, output = 'shorts.mp4', scriptFile] = process.argv.slice(2);
 if (!source) throw Error('node shorts.mjs NAVER_URL [OUTPUT.mp4] [SCRIPT.json]');
 if (!prepare && existsSync(output)) throw Error('Output already exists: ' + output);
@@ -62,9 +63,10 @@ function autoPlan() {
   return {title:title.split(/\s+/).slice(0,6).join(' '),scenes};
 }
 let plan;
-if (session && existsSync(local('plan.json'))) {
+const savedPlan = session && existsSync(local('plan.json'));
+if (savedPlan) {
   plan = JSON.parse(readFileSync(local('plan.json'), 'utf8'));
-} else if (session && !prepare) {
+} else if (session && action !== 'prepare') {
   throw Error('블로그 글을 먼저 확인하세요.');
 } else if (scriptFile) {
   plan = JSON.parse(readFileSync(scriptFile,'utf8'));
@@ -99,7 +101,7 @@ if (originalLines.length === 1) {
 // Older saved plans can include a separately summarized subtitle.
 for (const scene of plan.scenes) delete scene.caption;
 console.log('Photos:',photos.length,'Scenes:',plan.scenes.length,'Working files:',dir);
-save('plan.json',JSON.stringify(plan,null,2));
+if (!savedPlan) save('plan.json',JSON.stringify(plan,null,2));
 async function scenePhoto(scene) {
   const name = 'photo-' + scene.photo;
   if (!existsSync(local(name))) {
@@ -109,18 +111,97 @@ async function scenePhoto(scene) {
   }
   return local(name);
 }
+async function checkedPhoto(scene, index) {
+  const file = local('photo-' + scene.photo);
+  const cached = existsSync(file);
+  const decode = async () => {
+    await scenePhoto(scene);
+    run(ffmpeg, ['-v','error','-xerror','-abort_on','empty_output','-i',file,
+      '-map','0:v:0','-frames:v','1','-f','null','-']);
+  };
+  try {
+    try { await decode(); }
+    catch (error) {
+      if (!cached) throw error;
+      rmSync(file, {force:true});
+      await decode();
+    }
+  } catch (error) {
+    rmSync(file, {force:true});
+    throw Error(`${index + 1}번째 장면의 본문 사진 ${scene.photo}번을 읽을 수 없습니다. 원본 사진과 연결 상태를 확인하고 다시 시도하세요.`, {cause:error});
+  }
+  return file;
+}
 if (prepare) {
   const first = plan.scenes[0];
-  const photo = await scenePhoto(first);
-  const styles = [];
-  for (const template of templates) {
-    console.log('미리보기 · ' + template.name);
-    const poster = local('preview-' + template.id + '.jpg');
-    writeFileSync(local('scene.ass'),sceneAss(template, plan.title, first.text, 4, 4));
-    run(ffmpeg, [...sceneArgs(template, photo), '-frames:v','1','-q:v','3',poster]);
-    styles.push({id:template.id, name:template.name, image:'data:image/jpeg;base64,' + readFileSync(poster).toString('base64')});
+  const edit = JSON.parse(process.env.SHORTS_EDIT || '{}');
+  const priceSources = plan.scenes.flatMap(scene => {
+    const n = scene.evidencePhoto ?? scene.photo;
+    return [...(photos[n-2]?.lines ?? introduction), ...photos[n-1].lines];
+  });
+  const jpeg = file => 'data:image/jpeg;base64,' + readFileSync(file).toString('base64');
+  if (action === 'photos') {
+    const numbers = photos.flatMap((photo,i) => photo.isCover ? [] : [i+1]);
+    const offset = edit.offset ?? 0;
+    if (!Number.isInteger(offset) || offset < 0) throw Error('사진 목록을 다시 여세요.');
+    const choices = [];
+    for (const number of numbers.slice(offset, offset + 8)) {
+      const thumb = local('thumb-' + number + '.jpg');
+      let image = null;
+      try {
+        if (!existsSync(thumb)) {
+          const photo = await scenePhoto({photo:number});
+          const temp = thumb + '.tmp.jpg';
+          run(ffmpeg, ['-v','error','-xerror','-y','-i',photo,'-frames:v','1','-vf','scale=160:160:force_original_aspect_ratio=decrease','-q:v','5',temp]);
+          renameSync(temp, thumb);
+        }
+        image = jpeg(thumb);
+      } catch {
+        rmSync(local('photo-' + number), {force:true});
+      }
+      choices.push({photo:number, image, used:plan.scenes.slice(1).some(s => s.photo === number)});
+    }
+    save('choices.json',JSON.stringify({choices,total:numbers.length}));
+    process.exit(0);
   }
-  save('preview.json', JSON.stringify({title:plan.title, articleTitle:title, styles}));
+  if (action === 'ending') {
+    const text = await suggestReviewEnding(plan, {previous:edit.ending || plan.ending?.text, priceSources});
+    save('suggestion.json',JSON.stringify({text}));
+    process.exit(0);
+  }
+  const lastText = plan.scenes.at(-1).text;
+  if (action === 'apply') {
+    if (edit.photo != null && edit.photo !== first.photo) {
+      if (!Number.isInteger(edit.photo) || !photos[edit.photo-1] || photos[edit.photo-1].isCover)
+        throw Error('블로그 본문에 있는 첫 사진을 선택하세요.');
+      first.evidencePhoto ??= first.photo;
+      first.photo = edit.photo;
+      if (first.photo === first.evidencePhoto) delete first.evidencePhoto;
+    }
+    if (edit.ending != null) setReviewEnding(plan, edit.ending, priceSources);
+  }
+  const previous = existsSync(local('preview.json')) ? JSON.parse(readFileSync(local('preview.json'),'utf8')) : {};
+  let styles = previous.styles;
+  if (!styles || first.photo !== previous.photo || first.text !== previous.firstText || plan.title !== previous.title) {
+    const photo = await checkedPhoto(first, 0);
+    styles = [];
+    for (const template of templates) {
+      console.log('미리보기 · ' + template.name);
+      const poster = local('preview-' + template.id + '.jpg');
+      writeFileSync(local('scene.ass'),sceneAss(template, plan.title, first.text, 4, 4));
+      run(ffmpeg, [...sceneArgs(template, photo), '-frames:v','1','-q:v','3',poster]);
+      styles.push({id:template.id, name:template.name, image:jpeg(poster)});
+    }
+  }
+  if (action === 'apply') {
+    if (lastText !== plan.scenes.at(-1).text) {
+      rmSync(local('voice.ready'), {force:true});
+      rmSync(local((plan.scenes.length-1) + '.wav'), {force:true});
+    }
+    save('plan.json',JSON.stringify(plan,null,2));
+  }
+  save('preview.json', JSON.stringify({title:plan.title, articleTitle:title, styles,
+    photo:first.photo, firstText:first.text, ending:plan.ending}));
   process.exit(0);
 }
 const template = templates.find(t => t.id === (process.env.SHORTS_TEMPLATE || plan.template || 'white'));
@@ -130,6 +211,12 @@ if (process.env.SHORTS_PLAN_PATH) {
   writeFileSync(process.env.SHORTS_PLAN_PATH, JSON.stringify({...plan,template:template.id}, null, 2), {flag:'wx'});
 }
 writeFileSync(local('scenes.json'),JSON.stringify(plan.scenes,null,2));
+const readyPhotos = new Map();
+for (const [index, scene] of plan.scenes.entries()) {
+  if (readyPhotos.has(scene.photo)) continue;
+  console.log(`사진 확인 · ${index + 1}/${plan.scenes.length}장면`);
+  readyPhotos.set(scene.photo, await checkedPhoto(scene, index));
+}
 if (process.env.SHORTS_VOICE === 'gemini') {
   const {synthesizeGeminiScenes} = await import('./gemini-voice.mjs');
   await synthesizeGeminiScenes(plan.scenes, dir, {reuseCompleted:Boolean(session)});
@@ -148,7 +235,7 @@ if (process.env.SHORTS_VOICE === 'gemini') {
 
 for (const [i,scene] of plan.scenes.entries()) {
   console.log(`영상 합성 · ${i + 1}/${plan.scenes.length}장면`);
-  const photo = await scenePhoto(scene);
+  const photo = readyPhotos.get(scene.photo);
   const probe=run(ffmpeg,['-hide_banner','-i',i+'.wav','-f','null','-']).stderr;
   const duration=probe.match(/Duration: (\d+):(\d+):([\d.]+)/);
   if (!duration) throw Error('Cannot measure narration duration.');

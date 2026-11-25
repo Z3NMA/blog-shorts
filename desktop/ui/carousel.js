@@ -68,7 +68,7 @@ export function createCarousel(elements, remember) {
   next.onclick = () => advance(1);
   mode.onclick = () => showGrid(gallery.hidden);
   picker.addEventListener('keydown', e => {
-    if (deck.hidden || !['ArrowLeft','ArrowRight'].includes(e.key)) return;
+    if (deck.hidden || e.target.closest('.scene-editor') || !['ArrowLeft','ArrowRight'].includes(e.key)) return;
     e.preventDefault();
     advance(e.key === 'ArrowLeft' ? -1 : 1);
   });

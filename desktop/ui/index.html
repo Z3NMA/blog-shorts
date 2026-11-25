@@ -19,6 +19,15 @@
       <div class="deck" id="deck" aria-label="좌우로 넘기는 첫 장면 미리보기"></div>
       <div class="tiles" id="gallery" role="group" aria-label="모든 스타일" hidden></div>
       <div class="controls" id="arrows"><button class="arrow" id="prev" type="button" aria-label="이전 스타일">‹</button><div class="which" role="status"><b id="styleName"></b><small id="count"></small></div><button class="arrow" id="next" type="button" aria-label="다음 스타일">›</button></div>
+      <div class="scene-editor">
+        <div class="edit-head"><h3>첫 사진</h3><button id="choosePhoto" class="plain" type="button" aria-expanded="false" aria-controls="photoPanel">사진 바꾸기</button></div>
+        <div id="photoPanel" hidden><p class="edit-note">첫 장면의 대사에 어울리는 본문 사진을 고르세요.</p>
+          <div class="photo-choices" id="photoChoices" role="group" aria-label="첫 사진 후보"></div>
+          <button id="morePhotos" class="plain" type="button" hidden>사진 더 보기</button></div>
+        <div class="edit-head ending-head"><label for="ending">마지막 멘트</label><button id="rewrite" type="button" class="plain" title="DeepSeek를 한 번 호출합니다">AI로 다시 쓰기</button></div>
+        <p class="edit-note" id="endingBody"></p>
+        <textarea id="ending" maxlength="90" rows="2" aria-describedby="endingBody" required></textarea>
+      </div>
       <div class="bottom"><button class="primary" id="create" type="button">이 스타일로 제작</button></div>
     </section>
     <section id="finished" hidden aria-label="완성된 영상"><div class="result-body">

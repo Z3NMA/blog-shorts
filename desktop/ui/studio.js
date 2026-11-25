@@ -32,11 +32,11 @@ function requireSetting(id, message) {
   $(id).focus();
   status('error','설정을 확인하세요', message);
 }
-function bindBusy(value) {
+function bindBusy(value, rendering = false) {
   working = value;
   $('inputs').disabled = value;
   $('confirm').textContent = value && page === 'entry' ? '확인 중…' : '확인';
-  $('create').textContent = value && page === 'picker' ? '제작 중…' : '이 스타일로 제작';
+  $('create').textContent = rendering ? '제작 중…' : '이 스타일로 제작';
 }
 function job(url) {
   return {url, apiKey:$('key').value.trim(), geminiKey:$('geminiKey').value.trim(),
@@ -70,6 +70,10 @@ async function prepare() {
     $('settings').open = false;
     show('picker');
     carousel.reset(manifest.styles, saved.style || 'white');
+    $('ending').value = manifest.ending?.text ?? '';
+    $('endingBody').textContent = '앞 대사 · ' + (manifest.ending?.body ?? '');
+    togglePhotos(false);
+    $('photoChoices').replaceChildren();
     $('result').hidden = true;
   } catch (e) { status('error','미리보기를 준비하지 못했습니다',String(e)); }
   finally {bindBusy(false);}
@@ -79,22 +83,95 @@ $('confirm').onclick = prepare;
 $('url').onkeydown = e => { if(e.key === 'Enter' && !e.isComposing) {e.preventDefault();prepare();} };
 $('edit').onclick = () => {show('entry');$('result').hidden = true;$('url').focus();$('url').select();};
 $('again').onclick = () => {show('picker');$('result').hidden = true;$('mode').focus();};
+async function editPreview(operation, edit) {
+  const result = await invoke('prepare', {job:{...job(preview.url), geminiKey:'', token:preview.token,
+    operation, edit:JSON.stringify(edit)}});
+  const manifest = JSON.parse(result.manifest);
+  if (operation === 'apply') {
+    Object.assign(preview, manifest, {audioReady:result.audioReady});
+    carousel.reset(manifest.styles, saved.style);
+  }
+  return manifest;
+}
+async function editing(message, work) {
+  if (working) return;
+  bindBusy(true);
+  status('working',message,'잠시 기다려 주세요.');
+  try { await work(); $('result').hidden = true; }
+  catch (error) { status('error','편집을 완료하지 못했습니다',String(error)); }
+  finally { bindBusy(false); }
+}
+function markPhoto() {
+  for (const button of $('photoChoices').children) {
+    button.setAttribute('aria-pressed', String(Number(button.value) === preview.photo));
+  }
+}
+async function loadPhotos() {
+  const list = $('photoChoices');
+  await editing('본문 사진을 불러오는 중', async () => {
+    const {choices,total} = await editPreview('photos',{offset:list.childElementCount});
+    for (const {photo,image,used} of choices) {
+      const button = document.createElement('button');
+      button.type = 'button'; button.value = photo; button.className = 'photo-choice';
+      if (image) {
+        const thumbnail = new Image(); thumbnail.src = image; thumbnail.alt = '';
+        button.append(thumbnail);
+      }
+      button.append('사진 ' + photo + (!image ? ' · 읽기 실패' : used ? ' · 본문 사용 중' : ''));
+      button.disabled = !image;
+      button.onclick = () => editing('첫 장면을 갱신하는 중', async () => {
+        if (photo !== preview.photo) await editPreview('apply',{photo});
+        markPhoto();
+        togglePhotos(false);
+      }).then(() => $('choosePhoto').focus({preventScroll:true}));
+      list.append(button);
+    }
+    markPhoto();
+    $('morePhotos').hidden = list.childElementCount >= total;
+  });
+}
+function togglePhotos(open) {
+  $('photoPanel').hidden = !open;
+  $('choosePhoto').setAttribute('aria-expanded',String(open));
+  $('choosePhoto').textContent = open ? '사진 목록 닫기' : '사진 바꾸기';
+}
+$('choosePhoto').onclick = async () => {
+  const open = $('photoPanel').hidden;
+  togglePhotos(open);
+  if (open && !$('photoChoices').childElementCount) await loadPhotos();
+};
+$('morePhotos').onclick = loadPhotos;
+$('rewrite').onclick = async () => {
+  if (!$('key').value.trim() && !defaults.hasKey) return requireSetting('key','AI로 마지막 멘트를 다시 쓰려면 DeepSeek API 키를 입력하세요.');
+  await editing('전체 대본을 읽고 마지막 멘트를 쓰는 중', async () => {
+    const {text} = await editPreview('ending',{ending:$('ending').value.trim()});
+    $('ending').value = text;
+  });
+  $('ending').focus({preventScroll:true});
+};
 $('create').onclick = async () => {
   if (working || !preview) return;
   const data = job(preview.url), style = carousel.selected;
-  if (!data.geminiKey && !defaults.hasGeminiKey && !preview.audioReady)
+  const ending = $('ending').value.trim();
+  if (!ending) {
+    status('error','마지막 멘트를 확인하세요','마지막에 읽을 문장을 입력하세요.');
+    $('ending').focus(); return;
+  }
+  const changed = ending !== preview.ending?.text;
+  if (!data.geminiKey && !defaults.hasGeminiKey && (!preview.audioReady || changed))
     return requireSetting('geminiKey','내레이션에 사용할 Google AI Studio의 Gemini API 키를 입력하세요.');
   if (!data.outputFolder) return requireSetting('chooseFolder','MP4를 저장할 폴더를 선택하세요.');
-  bindBusy(true);
+  bindBusy(true, true);
   $('settings').open = false;
   persist();
   status('working','숏츠 제작 중',style.name + ' 스타일로 제작합니다.');
   $('result').scrollIntoView({block:'nearest'});
   try {
+    if (changed) await editPreview('apply',{ending});
     const file = await invoke('generate',{job:{...data,apiKey:'',token:preview.token,template:style.id}});
     preview.audioReady = true;
     $('file').textContent = file;
-    $('player').poster = style.image;
+    $('player').poster = preview.styles.find(s => s.id === style.id).image;
     $('player').src = convertFileSrc(file);
     show('finished');
     $('result').hidden = true;

@@ -15,6 +15,7 @@ const singleScene = {...scene, text:scene.text + ' ' + wrapUp};
 const completion = value => Response.json({choices:[
   {finish_reason:'stop', message:{content:JSON.stringify(value)}}
 ]});
+const exhausted = () => Response.json({error:{message:'Daily quota exceeded'}},{status:429});
 
 function writerAndReviewer(draft, review) {
   return async (_url, options) => {
@@ -47,7 +48,7 @@ test('세 번째 요청은 검증된 제목과 첫 장면부터 마지막까지�
   const photos = [photo, {lines:['참나무로 훈연했어요.']}, {lines:['따뜻한 차도 나와요.']}];
   const plan = await createDeepSeekPlan('바비큐', '', photos, {apiKey:'test', request});
   assert.equal(calls.length, 3);
-  assert.deepEqual(plan, {title:opening.title, scenes:[scene, middle, {...tea, text:tea.text + ' ' + invitation}]});
+  assert.deepEqual(plan, {title:opening.title, ending:{body:tea.text,text:invitation}, scenes:[scene, middle, {...tea, text:tea.text + ' ' + invitation}]});
 });
 
 test('두 단계 모두 사진 번호와 인용을 확인한다', async () => {
@@ -78,7 +79,7 @@ test('마지막 사진을 중간과 중복해도 근거 있는 마무리 대사�
 
 test('집필이 실패하면 저장해 둔 첫 장면부터 이어서 집필한다', async () => {
   let cachedOpening;
-  const request = async () => cachedOpening ? new Response(null, {status:429}) : completion({candidates:[opening]});
+  const request = async () => cachedOpening ? exhausted() : completion({candidates:[opening]});
   await assert.rejects(createDeepSeekPlan('바비큐', '', [photo], {
     apiKey:'test', request, onOpening:value => { cachedOpening = value; },
   }), /429/);
@@ -86,14 +87,14 @@ test('집필이 실패하면 저장해 둔 첫 장면부터 이어서 집필한�
   const plan = await createDeepSeekPlan('바비큐', '', [photo], {
     apiKey:'test', cachedOpening, onOpening:assert.fail, request:writerAndReviewer(singleSceneDraft, {wrapUp}),
   });
-  assert.deepEqual(plan, {title:opening.title, scenes:[singleScene]});
+  assert.deepEqual(plan, {title:opening.title, ending:{body:scene.text,text:wrapUp}, scenes:[singleScene]});
 });
 
 test('마무리 요청 실패 후 이미 작성한 대본을 그대로 사용해 마무리만 재시도한다', async () => {
   let cachedDraft;
   await assert.rejects(createDeepSeekPlan('바비큐', '', [photo], {
     apiKey:'test', cachedOpening:opening, onDraft:value => { cachedDraft = value; },
-    request:async () => cachedDraft ? new Response(null,{status:429}) : completion(singleSceneDraft),
+    request:async () => cachedDraft ? exhausted() : completion(singleSceneDraft),
   }), /429/);
   assert.deepEqual(cachedDraft, singleSceneDraft);
   let calls = 0;

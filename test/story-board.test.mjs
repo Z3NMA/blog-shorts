@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createDeepSeekPlan, proposeStories, setReviewEnding, suggestReviewEnding} from '../deepseek-planner.mjs';
-import {editScenes} from '../scene-editor.mjs';
+import {createDeepSeekPlan, proposeStories, setReviewEnding, suggestReviewEnding} from '../engine/deepseek-planner.mjs';
+import {editScenes} from '../engine/scene-editor.mjs';
 
 const photos = [
   {lines:['산 너머에 가게가 있어요.']}, {lines:['모닝빵에 고기를 넣어요.']},

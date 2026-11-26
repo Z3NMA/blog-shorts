@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp, readFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {synthesizeGeminiScenes} from '../gemini-voice.mjs';
+import {synthesizeGeminiScenes} from '../engine/gemini-voice.mjs';
 
 test('Gemini sends the exact caption text per scene and saves Google WAV output', async t => {
   const dir = await mkdtemp(path.join(tmpdir(), 'gemini-test-'));

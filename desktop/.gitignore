@@ -2,3 +2,7 @@
 /src-tauri/gen/
 /src-tauri/release-runtime/
 /dist/
+/stage/
+/release-tools/
+/webview-x64/
+/blog-shorts.zip

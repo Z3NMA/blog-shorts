@@ -1,0 +1,9 @@
+# Local narration models and Python environments
+/.venv/
+/supertonic.tar.bz2
+/sherpa-onnx-supertonic-*/
+__pycache__/
+
+# CLI output in the checkout
+/*.mp4
+/*.plan.json

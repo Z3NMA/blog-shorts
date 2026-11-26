@@ -224,7 +224,7 @@ fn node_script(app: &AppHandle, name: &str) -> Result<Command, String> {
     } else if let Some(p) = adjacent(&resource) {
         p
     } else if cfg!(debug_assertions) {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(name)
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../engine").join(name)
     } else {
         return Err("제작 엔진을 찾을 수 없습니다. 배포용 blog-shorts.exe를 다시 실행하세요.".into());
     };

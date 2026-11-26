@@ -1,49 +1,91 @@
-# 블로그 쇼츠
+<p align="center">
+  <img src="desktop/src-tauri/icons/icon.png" width="72" height="72" alt="">
+</p>
 
-공개 네이버 블로그 링크로 원문 사진과 한국어 내레이션을 담은 세로 MP4를 만듭니다. 사진은 장면마다 한 번 잘라 고정합니다.
+<h1 align="center">Blog Shorts</h1>
 
-## 데스크톱 앱
+<p align="center">
+  공개 네이버 블로그 글을 한국어 내레이션과 자막이 있는 세로 영상으로 만듭니다.<br>
+  원문 사진과 대사를 장면마다 편집하고, 목소리와 스타일을 골라 MP4로 저장하세요.
+</p>
 
-Windows 10/11 x64에서는 **blog-shorts.zip**을 내려받아 압축을 풀고 **blog-shorts.exe**를 실행하세요. 첫 실행 때 앱이 사용자 폴더에 Node.js, FFmpeg, 글꼴과 WebView2를 풀고 다음 실행부터 재사용합니다. [Windows 배포 페이지](https://github.com/Z3NMA/blog-shorts/releases/latest)
+<p align="center">
+  <strong><a href="https://github.com/Z3NMA/blog-shorts/releases/latest/download/blog-shorts.zip">Windows용 다운로드 (.zip)</a></strong> ·
+  <a href="https://github.com/Z3NMA/blog-shorts/releases/latest">릴리스 노트</a> ·
+  <a href="#cli-quickstart">API 키 없이 CLI로 시작하기</a>
+</p>
 
-Windows용 Tauri 앱에서 블로그 주소와 DeepSeek·타입캐스트 API 키를 입력합니다. 글을 확인하면 DeepSeek가 제안한 이야기 중 원문 근거가 확인된 후보를 최대 세 개 보여줍니다. 제목·첫 사진·인용을 비교해 하나를 고르면 그 관점으로 장면별 대사를 쓰고, 대본 전체를 읽어 마지막 추천 멘트를 작성합니다. 음성 합성에 보낸 대사가 그대로 자막이 되며 긴 대사는 최대 두 줄씩 나누어 표시합니다.
+## 첫 영상 만들기
 
-**내레이션 목소리 → 목소리 고르기**에서 인기 목소리 24개를 바로 볼 수 있습니다. **전체 보기**를 처음 열면 계정에서 사용할 수 있는 목소리를 가져옵니다. 카드의 별을 누르면 **즐겨찾기**에 저장되어 다음 실행에도 남습니다. 공식 샘플이 있는 목소리는 바로 재생할 수 있고, **내 대사로 듣기**에서는 직접 쓴 문장이나 편집한 첫 장면을 한국어로 합성합니다. **이 목소리 사용**을 누르면 모든 장면에 같은 목소리와 모델을 적용합니다. CLI에서는 `TYPECAST_API_KEY`를 설정하고 앱이 내보낸 `.plan.json`을 대본으로 지정하면 같은 설정으로 렌더링합니다. 직접 지정하려면 `SHORTS_VOICE=typecast`, `TYPECAST_VOICE_ID`, `TYPECAST_MODEL`을 설정하세요. [타입캐스트 목소리 목록](https://typecast.ai/docs/api-reference/voices/list-voices)
+**준비물**은 Windows 10/11 x64 PC, 사진이 담긴 공개 네이버 블로그 글, 본인의 DeepSeek·타입캐스트 API 키입니다. DeepSeek는 원문을 바탕으로 대본을 쓰고, 타입캐스트는 편집한 대사를 읽습니다. 두 서비스 모두 사용량에 따라 비용이 발생할 수 있습니다. [DeepSeek 키 발급](https://platform.deepseek.com/api_keys) · [타입캐스트 키 발급](https://studio.typecast.ai/developers/api/api-key)
 
-**장면 검토**에서 모든 사진과 대사를 순서대로 확인하세요. 대사를 누르거나 **원문 확인**을 펼치면 기획에 인용한 구절과 선택한 사진 주변의 본문을 읽을 수 있습니다. 각 장면의 사진과 대사를 고친 다음 **편집 반영하고 스타일 선택**을 누르면 첫 장면을 일곱 가지 스타일로 미리 보여줍니다. CLI의 `SHORTS_TEMPLATE` 값은 `white`, `paper`, `grid`, `browser`, `blue`, `contrast`, `full`입니다. 세로 MP4와 미리보기는 같은 렌더링 정의를 사용합니다.
+1. **앱 열기** — `blog-shorts.zip`의 압축을 풀고 `blog-shorts.exe`를 실행하세요. 필요한 도구는 배포 파일에 들어 있으며, 첫 실행 때 사용자 폴더에 자동으로 준비됩니다.
+2. **글 불러오기** — **API 키 및 저장 폴더**에 두 키를 입력하세요. 블로그 글 주소를 붙여 넣고 **확인**을 누르면 이야기 후보가 최대 세 개 나타납니다. 첫 사진과 원문 인용을 비교한 뒤 **이 이야기로 대본 만들기**를 누르세요.
+3. **장면 편집하기** — **장면 검토**에서 사진을 바꾸거나 대사를 고치세요. **원문 확인**을 펼치면 선택한 사진 주변의 글을 읽을 수 있습니다. 여기서 고친 문장이 내레이션과 자막에 함께 쓰입니다.
+4. **스타일과 목소리 고르기** — **편집 반영하고 스타일 선택**을 눌러 첫 장면을 일곱 가지 스타일로 비교하세요. **목소리 고르기**에서 **내 대사로 듣기**로 발음과 억양을 확인한 뒤 **이 목소리 사용**을 누르세요.
+5. **영상 저장하기** — **이 스타일로 제작**을 누르세요. 완성된 영상은 앱에서 바로 재생할 수 있습니다. **저장 폴더 열기**를 누르면 MP4와 다시 편집할 수 있는 대본 파일(`.plan.json`)이 함께 있습니다.
 
-패키지의 `fonts` 폴더에 프리텐다드, 고운바탕, 주아 글꼴과 각각의 배포 라이선스가 있습니다.
+기본 저장 위치는 사용자 **동영상** 폴더의 `Blog Shorts`입니다. 영상은 **720 × 1280 (9:16), 30 fps, H.264/AAC**로 저장됩니다. 장면 길이는 실제 내레이션에 맞춰 정해지고, 긴 대사는 최대 두 줄씩 나뉘어 표시됩니다.
 
-[데스크톱 실행 및 빌드 방법](desktop/README.md)
+<details>
+<summary>API 키 보관과 사용량</summary>
 
-새 대본을 만들 때는 본문 사진 중 블로그 링크의 대표 이미지와 일치하는 사진이나 파일명에 썸네일 표시가 있는 표지를 거릅니다. 일반 사진 한 장만 올린 글은 그 사진을 사용합니다. 마지막 장면에서는 경험이나 팁을 전한 뒤, 이 장소나 메뉴가 어울리는 시청자에게 방문이나 시식을 자연스럽게 권합니다. 이 끝맺음까지 같은 장면의 내레이션과 자막에 담습니다.
+앱에 직접 입력한 키는 앱을 닫을 때까지 메모리에만 보관합니다. PC에 `DEEPSEEK_API_KEY`와 `TYPECAST_API_KEY` 환경 변수를 설정해 두면 앱을 열 때마다 입력할 필요가 없습니다.
 
-마지막 멘트는 직접 고치거나 **AI로 다시 쓰기**로 방금 편집한 대본에 어울리는 제안을 받을 수 있습니다. 같은 글을 열어 둔 동안 이야기별 편집 내용이 유지됩니다. 다른 후보로 처음 대본을 만들면 집필과 마무리를 새로 요청합니다. 이미 만든 대본을 다시 열거나 사진을 바꾸는 작업은 AI를 호출하지 않습니다. 같은 앱 실행 중에는 대사·목소리·모델이 일치하는 음성을 재사용합니다.
+새 이야기의 대본을 만들거나 마지막 멘트를 **AI로 다시 쓰기** 하면 DeepSeek를 호출합니다. 사진 교체와 직접 편집은 로컬에서 처리합니다. **내 대사로 듣기**로 새 음성을 합성하면 타입캐스트 크레딧을 사용하며, 같은 실행 중에는 대사·목소리·모델이 같은 음성을 영상 제작에도 재사용합니다.
 
-앱은 사진 번호·인용과 함께 가격 문장의 대상·금액·조건을 원문과 대조합니다. 가격 검증에 실패하면 본문 집필을 한 번 더 요청할 수 있고, AI로 마지막 멘트를 다시 쓰는 경우에도 별도 요청이 발생합니다. 음성 합성 전에는 선택한 사진 전체를 FFmpeg로 확인합니다.
+</details>
 
-### 비용과 비교 방법
+<a name="cli-quickstart"></a>
 
-2026년 11월 24일 가격 기준으로 입력 3,000토큰·출력 1,000토큰에 캐시 할인을 적용하지 않은 Flash 요청 한 번은 약 $0.00105~0.00210입니다. 새 대본의 비용은 기획, 본문 집필, 마무리 작성에 사용한 세 요청의 사용량을 합산합니다. 제천 예시 대본 327자에 DeepSeek 음성을 적용하면 할인 단가에서 약 $0.00736가 추가됩니다. 실제 비용은 토큰·글자 수와 청구 시점의 단가에 따릅니다. [대본·음성 요금표](https://api-docs.deepseek.com/quick_start/pricing/) · [음성 API 안내](https://api-docs.deepseek.com/guides/tts/)
+## CLI로 만들기
 
-같은 대본으로 음성을 비교하려면 아래 CLI의 세 번째 인수로 `jecheon.json` 또는 이전 실행에서 생성된 `plan.json`을 지정하세요. 대본 작성을 건너뛰고 동일한 문장을 읽으므로 가격·음식 이름의 발음, 문장 끝 억양, 장면 사이 호흡을 직접 비교할 수 있습니다.
+Windows에서 **Node.js 22 LTS 이상**과 **FFmpeg**(libass, libx264, AAC 지원)를 준비하세요. 기본 모드는 본문에서 대사를 추출해 PC에 설치된 한국어 데스크톱 음성으로 읽습니다. 이 음성은 Windows PowerShell 5.1에서 사용할 수 있어야 합니다. FFmpeg가 PATH에 없다면 PowerShell에서 `$env:FFMPEG = 'C:\도구\ffmpeg.exe'`처럼 실행 파일의 위치를 지정하세요.
+
+PowerShell에서 다음 명령을 실행하면 저장소를 내려받고, 제천 바비큐 방문기를 예시 대본으로 읽은 `jecheon.mp4`를 만듭니다.
 
 ```powershell
-# DEEPSEEK_API_KEY 환경변수가 설정된 PowerShell에서 실행
-$env:SHORTS_VOICE = 'deepseek'
-$env:DEEPSEEK_VOICE = 'stella'
-node shorts.mjs https://blog.naver.com/lumi6_6/224480520476 stella.mp4 jecheon.json
+git clone https://github.com/Z3NMA/blog-shorts.git
+cd blog-shorts
+
+$post = 'https://blog.naver.com/lumi6_6/224480520476'
+node .\shorts.mjs $post .\jecheon.mp4 .\examples\jecheon.json
 ```
 
-CLI에서 대본까지 새로 생성하려면 `SHORTS_PLANNER=deepseek`를 환경변수로 설정하고 대본 파일 인수를 생략하세요. 기본 CLI는 키 없이 기존 로컬 대본 추출 방식을 사용합니다.
+예시 대본의 첫 장면은 본문의 19번째 사진에 “제천 산골에서 이런 바비큐를 먹을 수 있다고요?”라는 대사를 붙입니다. `photo`는 1부터 시작하는 본문 사진 번호이고, `text`는 음성과 자막에 쓰이는 문장입니다. 장면 순서나 문장을 바꾸면 같은 글로 다른 영상을 만들 수 있습니다. [예시 대본 전체 보기](examples/jecheon.json)
 
-## 준비
+**내 글로 만들 때**는 `$post`를 내 글 주소로 바꾸고 대본 인수를 생략하세요. 사진 뒤에 나오는 문장에서 최대 아홉 장면을 구성합니다. 사진 설명이 짧거나 원하는 대사가 따로 있다면 예시 형식으로 대본을 작성해 세 번째 인수로 전달하세요. 출력 파일명은 실행할 때마다 새 이름을 사용하세요.
 
-Windows 64비트, Node.js 22, FFmpeg가 필요합니다. FFmpeg는 libass, libx264, AAC를 지원하는 빌드를 사용하세요. ffmpeg.exe가 PATH에 없으면 PowerShell에서 `$env:FFMPEG = 'C:\도구\ffmpeg.exe'`로 위치를 지정하세요.
+```powershell
+node .\shorts.mjs $post .\my-shorts.mp4
+```
 
-### 무료 로컬 AI 음성
+<details>
+<summary>영상 스타일과 AI 음성 설정</summary>
 
-Python 3.12가 설치된 PC에서 아래 명령을 레포 폴더에서 실행하세요. 모델과 라이브러리는 처음 한 번 받습니다.
+| 바꾸고 싶은 항목 | PowerShell 환경 변수 |
+| --- | --- |
+| 영상 스타일 | `SHORTS_TEMPLATE`에 `white`(기본), `paper`, `grid`, `browser`, `blue`, `contrast`, `full` 중 하나를 지정 |
+| AI 대본 | `SHORTS_PLANNER=deepseek`와 `DEEPSEEK_API_KEY` 설정 후 대본 파일 인수 생략 |
+| 타입캐스트 음성 | `SHORTS_VOICE=typecast`, `TYPECAST_API_KEY`, `TYPECAST_VOICE_ID`, `TYPECAST_MODEL` 설정 |
+| DeepSeek 음성 | `SHORTS_VOICE=deepseek`와 `DEEPSEEK_API_KEY` 설정. `DEEPSEEK_VOICE`는 `stella`(기본) 또는 `tide` |
+| Gemini 음성 | `SHORTS_VOICE=gemini`와 `GEMINI_API_KEY` 설정 |
+
+예를 들어 아래 명령은 제천 방문기를 ‘종이 매거진’ 스타일로 렌더링합니다.
+
+```powershell
+$env:SHORTS_TEMPLATE = 'paper'
+node .\shorts.mjs https://blog.naver.com/lumi6_6/224480520476 .\jecheon-paper.mp4 .\examples\jecheon.json
+```
+
+앱의 설정을 그대로 쓰려면 새 PowerShell에서 `TYPECAST_API_KEY`를 설정하고 원래 글 주소와 함께 앱이 저장한 `.plan.json`을 세 번째 인수로 전달하세요. 파일에 선택한 스타일과 목소리 설정이 들어 있습니다.
+
+</details>
+
+<details>
+<summary>로컬 AI 음성 사용하기 (Supertonic 3)</summary>
+
+Python 3.12가 설치된 PC에서 아래 명령으로 라이브러리와 한국어 음성 모델을 한 번 내려받으세요.
 
 ```powershell
 python -m venv .venv
@@ -52,7 +94,7 @@ curl.exe -fL https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/
 tar -xf supertonic.tar.bz2
 ```
 
-PowerShell을 새로 열 때는 레포 폴더에서 다음 설정을 적용하고 아래 사용 예시를 실행하세요.
+새 PowerShell을 열 때마다 저장소 폴더에서 아래 환경 변수를 설정하세요. 음성은 CPU에서 합성하며, `SHORTS_SPEAKER`로 0~9번 화자를 선택할 수 있습니다. [한국어 음성 샘플](https://k2-fsa.github.io/sherpa/onnx/tts/all/Korean/supertonic-3-ko.html) · [모델 카드](https://huggingface.co/Supertone/supertonic-3)
 
 ```powershell
 $env:SHORTS_PYTHON = (Resolve-Path .venv/Scripts/python.exe).Path
@@ -60,24 +102,10 @@ $env:SUPERTONIC_MODEL = (Resolve-Path sherpa-onnx-supertonic-3-tts-int8-2026-05-
 $env:SHORTS_SPEAKER = '2'
 ```
 
-화자 번호는 0~9입니다. SUPERTONIC_MODEL을 설정하면 한국어 Supertonic 3를 CPU에서 실행합니다. 해당 변수를 생략하면 Windows PowerShell 5.1과 설치된 한국어 데스크톱 음성을 사용합니다. [한국어 음성 샘플](https://k2-fsa.github.io/sherpa/onnx/tts/all/Korean/supertonic-3-ko.html) · [모델 카드](https://huggingface.co/Supertone/supertonic-3)
+</details>
 
-## 사용
+## 개발 및 리소스
 
-이 폴더에서 실행하세요. 마지막 파일명은 새로 만들 영상의 경로입니다.
-
-```powershell
-node shorts.mjs https://blog.naver.com/lumi6_6/224480520476 my-shorts.mp4
-```
-
-자동 모드는 네이버 스마트에디터의 사진 순서와 뒤따르는 문단을 읽습니다. 사진별로 길이와 어미 조건에 맞는 문장을 찾아 최대 아홉 장면으로 구성합니다. 사진 내용을 시각적으로 판별하거나 새 대사를 쓰는 모델은 사용하지 않습니다. 이미지 뒤에 관련 설명이 적은 글은 직접 대본을 주는 편이 낫습니다.
-
-## 대본을 다듬어 렌더링하기
-
-```powershell
-node shorts.mjs https://blog.naver.com/lumi6_6/224480520476 edited.mp4 jecheon.json
-```
-
-jecheon.json은 같은 글을 바탕으로 제목과 대사를 편집한 예시입니다. photo는 본문에 나오는 사진 번호이며 1부터 시작합니다. text가 음성과 자막에 함께 쓰입니다. 제목의 줄바꿈으로 두 줄 배치를 지정할 수 있습니다.
-
-출력은 720×1280, 초당 30프레임의 H.264 영상입니다. 장면 전환은 합성 음성의 실제 길이에 맞추고, 한 장면 안의 긴 자막은 글자 수에 따라 나눠 표시합니다. 콘솔에 표시된 임시 작업 폴더에는 대본과 장면별 음성·영상이 남습니다. 렌더링 후 삭제해도 됩니다.
+- 영상 제작 코드는 [engine/](engine/), 예시 대본은 [examples/](examples/)에 있습니다. 저장소 루트에서 `node --test test/*.test.mjs`를 실행하면 회귀 테스트를 돌릴 수 있습니다. FFmpeg를 설정하면 사진 교체와 스타일 미리보기도 함께 검증합니다.
+- 앱을 소스에서 실행하거나 Windows 배포 파일을 빌드하는 방법은 [데스크톱 개발 가이드](desktop/README.md)에 정리되어 있습니다.
+- 영상에는 프리텐다드·고운바탕·주아 글꼴을 사용합니다. [글꼴 파일 및 배포 라이선스](engine/fonts/)

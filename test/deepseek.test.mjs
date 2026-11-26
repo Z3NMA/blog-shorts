@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {mkdtemp, readFile, rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {createDeepSeekPlan} from '../deepseek-planner.mjs';
-import {synthesizeDeepSeekScenes} from '../deepseek-voice.mjs';
+import {createDeepSeekPlan} from '../engine/deepseek-planner.mjs';
+import {synthesizeDeepSeekScenes} from '../engine/deepseek-voice.mjs';
 
 const photo = {lines:['따끈한 빵에 고기를 올려 먹어요.']};
 const scene = {photo:1, text:'빵과 고기를 함께 먹어요.', evidence:'빵에 고기를'};

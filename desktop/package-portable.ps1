@@ -12,16 +12,22 @@ $destination = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFrom
 if (Test-Path -LiteralPath $destination) { throw "Output already exists: $destination" }
 $stage = Join-Path $StageDirectory 'Blog Shorts'
 if (Test-Path -LiteralPath $stage) { throw "Choose an empty staging directory: $StageDirectory" }
-$engine = New-Item -ItemType Directory -Path (Join-Path $stage 'engine') -Force
+$null = New-Item -ItemType Directory -Path $stage -Force
 Copy-Item -LiteralPath $Executable -Destination (Join-Path $stage 'blog-shorts.exe')
 foreach ($item in 'node.exe', 'ffmpeg.exe', 'WebView2Loader.dll', 'notices') {
     Copy-Item -LiteralPath (Join-Path $RuntimeDirectory $item) -Destination $stage -Recurse
 }
-foreach ($module in 'shorts.mjs', 'blog-post.mjs', 'video-templates.mjs', 'deepseek-planner.mjs', 'deepseek-voice.mjs', 'gemini-voice.mjs', 'typecast-voice.mjs', 'price-check.mjs', 'rate-limit.mjs', 'scene-editor.mjs', 'voice_ai.py', 'voice.ps1') {
-    Copy-Item -LiteralPath (Join-Path "$PSScriptRoot/.." $module) -Destination $engine.FullName
+$tauri = Join-Path $PSScriptRoot 'src-tauri'
+$config = Get-Content -LiteralPath (Join-Path $tauri 'tauri.conf.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+foreach ($resource in $config.bundle.resources.PSObject.Properties) {
+    $source = Join-Path $tauri $resource.Name
+    $files = @(Get-ChildItem -LiteralPath (Split-Path $source) -Filter (Split-Path -Leaf $source) -File)
+    if (!$files.Count) { throw "Missing bundle resources: $source" }
+    $target = New-Item -ItemType Directory -Path (Join-Path $stage $resource.Value) -Force
+    foreach ($file in $files) {
+        Copy-Item -LiteralPath $file.FullName -Destination $target.FullName
+    }
 }
-Copy-Item -LiteralPath (Join-Path "$PSScriptRoot/.." 'fonts') -Destination $engine.FullName -Recurse
-Copy-Item -LiteralPath (Join-Path "$PSScriptRoot/.." 'layouts') -Destination $engine.FullName -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination $stage
 
 $fixed = Get-Item -LiteralPath (Join-Path $FixedRuntimeDirectory 'msedgewebview2.exe')
@@ -40,7 +46,7 @@ $archive = Join-Path $workspace 'runtime.zip'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [IO.Compression.ZipFile]::CreateFromDirectory((Get-Item -LiteralPath $stage).FullName, $archive)
 $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
-$version = (Get-Content -Raw -Encoding UTF8 (Join-Path $PSScriptRoot 'src-tauri/tauri.conf.json') | ConvertFrom-Json).version
+$version = $config.version
 if ((Get-Item -LiteralPath $Executable).VersionInfo.ProductVersion -ne $version) {
     throw "Rebuild the Tauri application for version $version."
 }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseBlogPost} from '../blog-post.mjs';
-import {createDeepSeekPlan} from '../deepseek-planner.mjs';
+import {parseBlogPost} from '../engine/blog-post.mjs';
+import {createDeepSeekPlan} from '../engine/deepseek-planner.mjs';
 
 const image = src => `<img class="se-image-resource" data-lazy-src="${src}">`;
 const note = text => `<p class="se-text-paragraph">${text}</p>`;

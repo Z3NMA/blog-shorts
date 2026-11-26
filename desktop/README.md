@@ -43,10 +43,13 @@ npm exec --yes --package=@tauri-apps/cli@2 -- tauri dev
 npm exec --yes --package=@tauri-apps/cli@2 -- tauri build
 ```
 
-Windows 배포 파일은 항상 `blog-shorts.exe` 한 개를 담은 `blog-shorts.zip`으로 제공합니다. Windows x64 릴리즈 빌드, 기존 포터블 런타임 폴더(`node.exe`, `ffmpeg.exe`, `WebView2Loader.dll`, `notices`), Microsoft의 x64 Fixed Version Runtime CAB를 푼 폴더(`msedgewebview2.exe` 포함)를 준비하세요. 배포를 갱신할 때 고정 런타임 버전도 함께 갱신하세요. [Microsoft 배포 가이드](https://learn.microsoft.com/microsoft-edge/webview2/concepts/distribution)
+포터블 배포 파일은 `blog-shorts.exe` 한 개를 담은 `blog-shorts.zip`입니다. `desktop/release-tools/`에 `node.exe`, `ffmpeg.exe`, `WebView2Loader.dll`과 `notices/`를 두세요. `desktop/webview-x64/`에는 Microsoft의 x64 Fixed Version Runtime CAB를 풀어 `msedgewebview2.exe`가 바로 아래에 오도록 합니다. [Microsoft 배포 가이드](https://learn.microsoft.com/microsoft-edge/webview2/concepts/distribution)
+
+`desktop` 폴더에서 아래 명령을 실행하면 ZIP이 `dist/`에 생깁니다. `stage/`에는 패키징 중간 파일이 남습니다. ZIP을 확인한 뒤 다음 빌드 전에 이 폴더를 정리하세요.
 
 ```powershell
-.\package-portable.ps1 -Executable .\src-tauri\target\release\blog-shorts.exe -RuntimeDirectory .\release-tools -FixedRuntimeDirectory .\webview-x64 -StageDirectory .\stage -OutputZip .\blog-shorts.zip
+$null = New-Item -ItemType Directory -Path .\dist -Force
+.\package-portable.ps1 -Executable .\src-tauri\target\release\blog-shorts.exe -RuntimeDirectory .\release-tools -FixedRuntimeDirectory .\webview-x64 -StageDirectory .\stage -OutputZip .\dist\blog-shorts.zip
 ```
 
-v0.2.0 사용자용 설치본은 추가 설정 `src-tauri/release.windows.json`으로 패키징합니다. `src-tauri/release-runtime`에 Windows x64용 Node.js 24.22.3의 node.exe, FFmpeg 9.0.2 essentials의 ffmpeg.exe, WebView2Loader.dll 및 notices 폴더의 배포 고지를 준비한 다음 위 빌드 명령에 `--config src-tauri/release.windows.json`을 추가하세요. 앱과 필수 실행 파일을 현재 사용자용으로 설치합니다.
+현재 사용자용 설치본에 런타임을 포함하려면 `desktop/src-tauri/release-runtime/`에 Windows x64용 `node.exe`, `ffmpeg.exe`, `WebView2Loader.dll`과 `notices/`를 두고, Tauri 빌드 명령에 `--config src-tauri/release.windows.json`을 추가하세요.

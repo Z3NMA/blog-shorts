@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createDeepSeekPlan, setReviewEnding, suggestReviewEnding} from '../deepseek-planner.mjs';
-import {verifyPrices} from '../price-check.mjs';
-import {retryRateLimit} from '../rate-limit.mjs';
-import {captionCards, sceneAss, templates} from '../video-templates.mjs';
+import {createDeepSeekPlan, setReviewEnding, suggestReviewEnding} from '../engine/deepseek-planner.mjs';
+import {verifyPrices} from '../engine/price-check.mjs';
+import {retryRateLimit} from '../engine/rate-limit.mjs';
+import {captionCards, sceneAss, templates} from '../engine/video-templates.mjs';
 
 const source = ['평일에만 햄치즈 두 개가 6,800원이에요.', '김치제육은 4,500원이에요.'];
 const detail = '줄은 길었는데, 포장된 오니기리라 제 차례는 금방 왔어요.';

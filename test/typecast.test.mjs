@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {getTypecastVoice, listTypecastVoices, typecastClip} from '../typecast-voice.mjs';
+import {getTypecastVoice, listTypecastVoices, typecastClip} from '../engine/typecast-voice.mjs';
 import {popularVoices} from '../desktop/ui/popular-voices.js';
 
 const voice = {id:'tc_a', model:'ssfm-v31'};

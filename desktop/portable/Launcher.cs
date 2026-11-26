@@ -10,6 +10,7 @@ using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 internal static class Launcher
 {
@@ -20,10 +21,15 @@ internal static class Launcher
     {
         try
         {
-            Task<string> prepare = Task.Run((Func<string>)Prepare);
-            Task.WhenAny(prepare, Task.Delay(600)).GetAwaiter().GetResult();
-            if (!prepare.IsCompleted) ShowProgress(prepare);
-            string folder = prepare.GetAwaiter().GetResult();
+            string folder;
+            using (var cancel = new CancellationTokenSource())
+            {
+                Task<string> prepare = Task.Run(() => Prepare(cancel.Token));
+                Task.WhenAny(prepare, Task.Delay(600)).GetAwaiter().GetResult();
+                if (!prepare.IsCompleted) ShowProgress(prepare, cancel);
+                folder = prepare.GetAwaiter().GetResult();
+                cancel.Token.ThrowIfCancellationRequested();
+            }
             var start = new ProcessStartInfo(Path.Combine(folder, "blog-shorts.exe"));
             start.UseShellExecute = false;
             start.WorkingDirectory = folder;
@@ -32,6 +38,7 @@ internal static class Launcher
             using (Process app = Process.Start(start)) { }
             return 0;
         }
+        catch (OperationCanceledException) { return 0; }
         catch (Exception e)
         {
             MessageBox.Show("앱을 열 수 없습니다.\n\n" + e.Message, "Blog Shorts",
@@ -40,40 +47,102 @@ internal static class Launcher
         }
     }
 
-    private static void ShowProgress(Task<string> prepare)
+    private sealed class ThemedProgressBar : ProgressBar
+    {
+        public ThemedProgressBar()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.Clear(Parent.BackColor);
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            float radius = Height / 2f;
+            using (var track = new Pen(BackColor, Height - 1))
+            using (var fill = new Pen(ForeColor, Height - 1))
+            {
+                track.StartCap = track.EndCap = fill.StartCap = fill.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                e.Graphics.DrawLine(track, radius, radius, Width - radius, radius);
+                if (Value > 0)
+                    e.Graphics.DrawLine(fill, radius, radius, radius + (Width - Height) * Value / Maximum, radius);
+            }
+        }
+    }
+
+    private static bool LightTheme()
+    {
+        try
+        {
+            return !Object.Equals(Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 1), 0);
+        }
+        catch (System.Security.SecurityException) { return true; }
+        catch (UnauthorizedAccessException) { return true; }
+    }
+
+    private static void ShowProgress(Task<string> prepare, CancellationTokenSource cancel)
     {
         Application.EnableVisualStyles();
         using (var form = new Form())
-        using (var bar = new ProgressBar())
+        using (var bar = new ThemedProgressBar())
+        using (var brandFont = new Font("Segoe UI", 12, FontStyle.Bold))
+        using (var brand = new Label())
+        using (var close = new Button())
         using (var label = new Label())
         using (var timer = new System.Windows.Forms.Timer())
         {
             form.Text = "Blog Shorts";
             form.StartPosition = FormStartPosition.CenterScreen;
-            form.FormBorderStyle = FormBorderStyle.FixedDialog;
-            form.ControlBox = false;
-            form.ClientSize = new Size(340, 90);
+            bool light = LightTheme(), contrast = SystemInformation.HighContrast;
+            form.FormBorderStyle = FormBorderStyle.None;
+            form.ClientSize = new Size(350, 124);
+            form.BackColor = contrast ? SystemColors.Window : (light ? Color.White : Color.FromArgb(36, 38, 46));
+            form.ForeColor = contrast ? SystemColors.WindowText : (light ? Color.FromArgb(25, 28, 36) : Color.FromArgb(240, 241, 246));
             form.Font = SystemFonts.MessageBoxFont;
+            form.Paint += delegate(object sender, PaintEventArgs e) {
+                ControlPaint.DrawBorder(e.Graphics, form.ClientRectangle, bar.BackColor, ButtonBorderStyle.Solid);
+            };
+            brand.SetBounds(22, 14, 190, 30);
+            brand.Font = brandFont;
+            brand.Text = "Blog Shorts";
+            close.SetBounds(296, 10, 42, 32);
+            close.FlatStyle = FlatStyle.Flat;
+            close.FlatAppearance.BorderSize = 0;
+            close.Text = "×";
+            close.Font = brandFont;
+            close.AccessibleName = "닫기";
+            close.Click += delegate { form.Close(); };
+            bool finished = false;
+            form.FormClosing += delegate(object sender, FormClosingEventArgs e) {
+                if (!finished) cancel.Cancel();
+            };
             label.Text = "앱 실행에 필요한 파일을 준비하고 있습니다…";
-            label.SetBounds(20, 17, 300, 23);
-            bar.SetBounds(20, 49, 300, 12);
+            label.SetBounds(22, 54, 306, 24);
+            bar.AccessibleName = "파일 준비 진행률";
+            bar.SetBounds(22, 90, 306, 8);
+            bar.BackColor = contrast ? SystemColors.WindowText : (light ? Color.FromArgb(217, 220, 230) : Color.FromArgb(73, 78, 91));
+            bar.ForeColor = contrast ? SystemColors.Highlight : (light ? Color.FromArgb(48, 77, 225) : Color.FromArgb(172, 185, 255));
+            form.Controls.Add(brand);
+            form.Controls.Add(close);
             form.Controls.Add(label);
             form.Controls.Add(bar);
             timer.Interval = 120;
             timer.Tick += delegate {
-                bar.Value = Volatile.Read(ref progress);
-                if (prepare.IsCompleted) form.Close();
+                int value = Volatile.Read(ref progress);
+                if (bar.Value != value) { bar.Value = value; bar.Invalidate(); }
+                if (prepare.IsCompleted) { finished = true; form.Close(); }
             };
             timer.Start();
             Application.Run(form);
         }
     }
 
-    private static FileStream OpenLock(string file)
+    private static FileStream OpenLock(string file, CancellationToken token)
     {
         var clock = Stopwatch.StartNew();
         while (true)
         {
+            token.ThrowIfCancellationRequested();
             try { return File.Open(file, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None); }
             catch (IOException e)
             {
@@ -84,7 +153,7 @@ internal static class Launcher
         }
     }
 
-    private static string Prepare()
+    private static string Prepare(CancellationToken token)
     {
         var assembly = Assembly.GetExecutingAssembly();
         string local = Environment.GetEnvironmentVariable("LOCALAPPDATA");
@@ -93,7 +162,7 @@ internal static class Launcher
         string root = Path.Combine(local, "Blog Shorts", "runtime",
             assembly.GetName().Version.ToString(3) + "-" + Package.Hash.Substring(0, 12));
         Directory.CreateDirectory(root);
-        using (OpenLock(Path.Combine(root, "prepare.lock")))
+        using (OpenLock(Path.Combine(root, "prepare.lock"), token))
         using (var stream = assembly.GetManifestResourceStream("runtime.zip"))
         using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, true))
         {
@@ -141,6 +210,7 @@ internal static class Launcher
                         int n;
                         while ((n = input.Read(buffer, 0, buffer.Length)) > 0)
                         {
+                            token.ThrowIfCancellationRequested();
                             output.Write(buffer, 0, n);
                             written += n;
                             Volatile.Write(ref progress, (int)(100 * written / total));

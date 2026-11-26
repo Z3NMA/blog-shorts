@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {createDeepSeekPlan, proposeStories, suggestReviewEnding} from './deepseek-planner.mjs';
 import {editScenes, sceneSources, sourceLines} from './scene-editor.mjs';
 import {parseBlogPost} from './blog-post.mjs';
+import {typecastClip, typecastSelection} from './typecast-voice.mjs';
 
 import {templates, sceneAss, sceneArgs} from './video-templates.mjs';
 
@@ -33,6 +34,7 @@ function run(cmd, args) {
   const env = {...process.env};
   delete env.DEEPSEEK_API_KEY;
   delete env.GEMINI_API_KEY;
+  delete env.TYPECAST_API_KEY;
   const r = spawnSync(cmd, args, {cwd:dir, encoding:'utf8', windowsHide:true, env});
   if (r.error || r.status !== 0) throw Error(r.error?.message || r.stderr || r.stdout);
   return r;
@@ -237,9 +239,18 @@ if (prepare) {
 }
 const template = templates.find(t => t.id === (process.env.SHORTS_TEMPLATE || plan.template || 'white'));
 if (!template) throw Error('영상 스타일을 다시 선택하세요.');
+const provider = process.env.SHORTS_VOICE || plan.narration?.provider;
+let voice;
+if (provider === 'typecast') {
+  voice = typecastSelection(process.env.TYPECAST_VOICE_ID || plan.narration?.id,
+    process.env.TYPECAST_MODEL || plan.narration?.model);
+}
 if (process.env.SHORTS_PLAN_PATH) {
   // Preserve the paid plan even if a later voice or rendering step fails.
-  writeFileSync(process.env.SHORTS_PLAN_PATH, JSON.stringify({...plan,template:template.id}, null, 2), {flag:'wx'});
+  const exported = {...plan,template:template.id};
+  if (voice) exported.narration = {provider, ...voice};
+  else delete exported.narration;
+  writeFileSync(process.env.SHORTS_PLAN_PATH, JSON.stringify(exported, null, 2), {flag:'wx'});
 }
 writeFileSync(local('scenes.json'),JSON.stringify(plan.scenes,null,2));
 const readyPhotos = new Map();
@@ -248,11 +259,18 @@ for (const [index, scene] of plan.scenes.entries()) {
   console.log(`사진 확인 · ${index + 1}/${plan.scenes.length}장면`);
   readyPhotos.set(scene.photo, await checkedPhoto(scene, index));
 }
-if (process.env.SHORTS_VOICE === 'gemini') {
+const audioFiles = plan.scenes.map((_, i) => i + '.wav');
+if (voice) {
+  const cache = process.env.SHORTS_TYPECAST_CACHE || local('typecast');
+  for (const [index, scene] of plan.scenes.entries()) {
+    console.log(`타입캐스트 음성 · ${index + 1}/${plan.scenes.length}장면`);
+    audioFiles[index] = await typecastClip(scene.text, voice, cache);
+  }
+} else if (provider === 'gemini') {
   const {synthesizeGeminiScenes} = await import('./gemini-voice.mjs');
   await synthesizeGeminiScenes(plan.scenes, dir, {reuseCompleted:Boolean(session)});
   if (session) save('voice.ready', 'ok');
-} else if (process.env.SHORTS_VOICE === 'deepseek') {
+} else if (provider === 'deepseek') {
   const {synthesizeDeepSeekScenes} = await import('./deepseek-voice.mjs');
   await synthesizeDeepSeekScenes(plan.scenes, dir);
 } else if (process.env.SUPERTONIC_MODEL) {
@@ -267,14 +285,14 @@ if (process.env.SHORTS_VOICE === 'gemini') {
 for (const [i,scene] of plan.scenes.entries()) {
   console.log(`영상 합성 · ${i + 1}/${plan.scenes.length}장면`);
   const photo = readyPhotos.get(scene.photo);
-  const probe=run(ffmpeg,['-hide_banner','-i',i+'.wav','-f','null','-']).stderr;
+  const probe=run(ffmpeg,['-hide_banner','-i',audioFiles[i],'-f','null','-']).stderr;
   const duration=probe.match(/Duration: (\d+):(\d+):([\d.]+)/);
   if (!duration) throw Error('Cannot measure narration duration.');
   const speech=Number(duration[1])*3600+Number(duration[2])*60+Number(duration[3]);
   const frames=Math.ceil((speech+0.20)*30);
   const end=frames/30;
   writeFileSync(local('scene.ass'),sceneAss(template, plan.title, scene.text, speech, end));
-  run(ffmpeg,[...sceneArgs(template, photo, i+'.wav'),'-map','2:a:0','-af','apad','-t',String(end),'-c:v','libx264','-preset','veryfast','-crf','19','-pix_fmt','yuv420p','-c:a','aac','-ar','48000',i+'.mp4']);
+  run(ffmpeg,[...sceneArgs(template, photo, audioFiles[i]),'-map','2:a:0','-af','apad','-t',String(end),'-c:v','libx264','-preset','veryfast','-crf','19','-pix_fmt','yuv420p','-c:a','aac','-ar','48000',i+'.mp4']);
 }
 writeFileSync(local('list.txt'),plan.scenes.map((_,i)=>"file '"+i+".mp4'").join('\n'));
 mkdirSync(path.dirname(path.resolve(output)),{recursive:true});

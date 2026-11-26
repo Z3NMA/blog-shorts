@@ -1,7 +1,15 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Blog Shorts</title><link rel="stylesheet" href="studio.css"><script type="module" src="studio.js"></script></head>
-<body><main class="app">
-  <div class="brand"><span class="logo" aria-hidden="true">▶</span>Blog Shorts</div>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Blog Shorts</title><link rel="stylesheet" href="studio.css"><link rel="stylesheet" href="voice-picker.css"><script type="module" src="studio.js"></script></head>
+<body>
+<header class="titlebar" data-tauri-drag-region="deep">
+  <div class="brand"><span class="logo" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><path d="M5 3.5a.8.8 0 0 1 1.2-.7l7 4.5a.8.8 0 0 1 0 1.4l-7 4.5a.8.8 0 0 1-1.2-.7z" fill="currentColor"/></svg></span>Blog Shorts</div>
+  <div class="window-actions" role="group" aria-label="창 제어" hidden>
+    <button id="windowMinimize" type="button" aria-label="최소화" title="최소화"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 12.5h11"/></svg></button>
+    <button id="windowMaximize" type="button" aria-label="최대화" title="최대화"><svg viewBox="0 0 20 20" aria-hidden="true"><rect class="maximize-icon" x="4.5" y="4.5" width="11" height="11" rx="1.5"/><path class="restore-icon" d="M7.8 5V3.8h8.4v8.4H15M4 7.5h8.5V16H4z"/></svg></button>
+    <button id="windowClose" type="button" aria-label="닫기" title="닫기"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5.5 5.5 9 9m0-9-9 9"/></svg></button>
+  </div>
+</header>
+<main id="workspace" aria-label="숏츠 작업 공간"><div class="app">
   <fieldset id="inputs" disabled>
     <section id="entry">
       <header class="hero"><h1>숏츠 만들기</h1>
@@ -12,6 +20,46 @@
         <button id="confirm" type="button" class="primary confirm">확인</button></div>
         <p class="input-note">새 글의 이야기 후보를 만들 때 DeepSeek를 호출합니다.</p>
       </div>
+      <div id="entryVoice"><section id="voicePanel" aria-labelledby="voiceHeading">
+        <div class="voice-heading">
+          <div id="voiceStack" aria-hidden="true"></div>
+          <div><h2 id="voiceHeading">내레이션 목소리</h2><p id="appliedVoice" role="status">선택한 목소리가 없습니다.</p></div>
+          <button id="loadVoices" type="button" aria-controls="voiceLibrary" aria-expanded="false"><span id="voiceToggleText">목소리 고르기</span><span class="voice-chevron" aria-hidden="true"></span></button>
+        </div>
+        <div id="voiceLibrary" hidden>
+          <div class="voice-browser">
+            <div class="voice-toolbar">
+              <div id="voiceViews" role="group" aria-label="목소리 목록 선택">
+                <button type="button" data-view="popular" aria-pressed="true">인기</button>
+                <button type="button" data-view="all" aria-pressed="false">전체 보기</button>
+                <button type="button" data-view="favorites" aria-pressed="false">즐겨찾기 <span id="favoriteCount">0</span></button>
+              </div><span id="voiceCount" role="status"></span>
+            </div>
+            <label class="voice-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+              <input id="voiceSearch" type="search" aria-label="목소리 검색" placeholder="한국어 또는 영어 이름 검색" autocomplete="off"></label>
+            <div id="voiceList" role="group" aria-label="인기 목소리"></div>
+            <p id="voiceEmpty" role="status" hidden></p>
+            <div id="voicePages" hidden>
+              <button id="voicePrev" type="button" aria-label="목소리 이전 페이지">이전</button>
+              <span id="voicePageNumber" role="status"></span>
+              <button id="voiceNext" type="button" aria-label="목소리 다음 페이지">다음</button>
+            </div>
+            <p id="voiceLibraryNotice" role="status"></p>
+            <template id="voiceStarIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.8 6.4.9-4.6 4.5 1.1 6.4-5.7-3-5.7 3 1.1-6.4-4.6-4.5 6.4-.9Z"/></svg></template>
+          </div>
+          <div id="voiceInspector">
+            <div class="voice-feature"><span id="candidatePortrait"></span><div><strong id="candidateName"></strong><span id="candidateUsage"></span></div></div>
+            <button id="sampleVoice" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7Z"/></svg>공식 샘플 듣기</button>
+            <div class="line-field"><label for="voiceText">미리 들을 대사</label>
+              <textarea id="voiceText" maxlength="2000" rows="2">오늘은 기억에 남는 곳을 소개해 드릴게요.</textarea></div>
+            <button id="previewVoice" type="button">내 대사로 듣기</button>
+            <p class="input-note">새 대사 합성 시 타입캐스트 크레딧을 사용합니다.</p>
+            <audio id="voicePlayer" controls preload="none" aria-label="목소리 미리 듣기" hidden></audio>
+            <p id="voiceFeedback" role="status"></p>
+            <button id="applyVoice" type="button">이 목소리 사용</button>
+          </div>
+        </div>
+      </section></div>
     </section>
     <div class="source-row" id="sourceRow" hidden><span class="naver" aria-hidden="true">N</span><strong id="article"></strong><button class="plain" id="edit" type="button">링크 변경</button></div>
     <section id="stories" hidden aria-labelledby="storiesTitle">
@@ -38,6 +86,7 @@
       <div class="deck" id="deck" aria-label="좌우로 넘기는 첫 장면 미리보기"></div>
       <div class="tiles" id="gallery" role="group" aria-label="모든 스타일" hidden></div>
       <div class="controls" id="arrows"><button class="arrow" id="prev" type="button" aria-label="이전 스타일">‹</button><div class="which" role="status"><b id="styleName"></b><small id="count"></small></div><button class="arrow" id="next" type="button" aria-label="다음 스타일">›</button></div>
+      <div id="pickerVoice"></div>
       <div class="bottom split"><button id="backReview" class="plain" type="button">장면 다시 편집</button><button class="primary" id="create" type="button">이 스타일로 제작</button></div>
     </section>
     <section id="finished" hidden aria-label="완성된 영상"><div class="result-body">
@@ -47,9 +96,9 @@
     </div></section>
     <details id="settings"><summary>API 키 및 저장 폴더</summary><div class="options">
       <label for="key">DeepSeek API 키</label><input type="password" id="key" autocomplete="off" spellcheck="false">
-      <label for="geminiKey">Gemini API 키</label><input type="password" id="geminiKey" autocomplete="off" spellcheck="false">
+      <label for="typecastKey">타입캐스트 API 키</label><input type="password" id="typecastKey" autocomplete="off" spellcheck="false">
       <label for="folder">MP4 저장 폴더</label><div class="field folder-field"><input id="folder" spellcheck="false"><button id="chooseFolder" type="button">폴더 선택</button></div>
     </div></details>
   </fieldset>
   <section id="result" role="status" aria-live="polite" hidden><strong id="state"></strong><p id="message"></p></section>
-</main></body></html>
+</div></main></body></html>

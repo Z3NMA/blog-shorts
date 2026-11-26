@@ -1,13 +1,16 @@
 import {createCarousel} from './carousel.js';
 import {createSceneBoard} from './scene-board.js';
+import {createVoicePicker} from './voice-picker.js';
+import {initWindowControls} from './window-controls.js';
 
 const $ = id => document.getElementById(id);
+initWindowControls(error => status('error','창을 조작하지 못했습니다',String(error)));
 const {invoke, convertFileSrc} = window.__TAURI__.core;
 let defaults, preview, working = false, page = 'entry';
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem('settings') || '{}') || {}; } catch {}
 function persist() {
-  const settings = {folder: $('folder').value, style: saved.style};
+  const settings = {folder: $('folder').value, style: saved.style, voice:saved.voice};
   try { localStorage.setItem('settings', JSON.stringify(settings)); } catch {}
 }
 const controls = ['deck','gallery','mode','modeName','arrows','prev','next','styleName','count','create','picker'];
@@ -15,10 +18,16 @@ const carousel = createCarousel(Object.fromEntries(controls.map(id => [id,$(id)]
   saved.style = id;
   persist();
 });
+const voices = createVoicePicker({initial:saved.voice, invoke, convertFileSrc, run:editing,
+  remember:voice => {saved.voice = voice; persist();},
+  hasKey:() => Boolean($('typecastKey').value.trim() || defaults?.hasTypecastKey),
+  askKey:() => requireSetting('typecastKey','전체 목록 조회와 미리 듣기, 영상 적용에 사용할 타입캐스트 API 키를 입력하세요.'),
+});
 function show(next) {
   page = next;
+  voices.show(page, preview?.firstText);
   for (const id of ['entry','stories','review','picker','finished']) $(id).hidden = id !== page;
-  window.scrollTo(0,0);
+  $('workspace').scrollTop = 0;
   $('sourceRow').hidden = page === 'entry';
   if (page !== 'finished') { $('player').pause(); $('player').removeAttribute('src'); $('player').load(); }
   if (page === 'picker') carousel.refresh();
@@ -42,7 +51,7 @@ function bindBusy(value, rendering = false) {
   $('create').textContent = rendering ? '제작 중…' : '이 스타일로 제작';
 }
 function job(url) {
-  return {url, apiKey:$('key').value.trim(), geminiKey:$('geminiKey').value.trim(),
+  return {url, apiKey:$('key').value.trim(),
     outputFolder:$('folder').value.trim()};
 }
 function postUrl(value) {
@@ -75,9 +84,9 @@ async function editing(message, work) {
 }
 
 async function requestEdit(operation, edit = {}) {
-  const result = await invoke('prepare', {job:{...job(preview.url), geminiKey:'', token:preview.token,
+  const result = await invoke('prepare', {job:{...job(preview.url), token:preview.token,
     operation, story:selectedStory, edit:JSON.stringify(edit)}});
-  return {...JSON.parse(result.manifest), audioReady:result.audioReady};
+  return JSON.parse(result.manifest);
 }
 
 function storyList() {
@@ -129,7 +138,7 @@ async function prepare() {
   if (!data.apiKey && !defaults.hasKey && url !== preview?.url)
     return requireSetting('key','이야기 후보를 만들려면 DeepSeek API 키를 입력하세요.');
   const ok = await editing('블로그에서 이야기 후보를 찾는 중', async () => {
-    const result = await invoke('prepare',{job:{...data, geminiKey:'', operation:'stories'}});
+    const result = await invoke('prepare',{job:{...data, operation:'stories'}});
     if (result.token !== preview?.token) { drafts.clear(); selectedStory = 0; }
     preview = {url, token:result.token, ...JSON.parse(result.manifest)};
     $('article').textContent = preview.articleTitle;
@@ -191,17 +200,23 @@ $('again').onclick = () => {show('picker');$('result').hidden = true;$('mode').f
 $('create').onclick = async () => {
   if (working || !preview) return;
   const data = job(preview.url), style = carousel.selected;
-  if (!data.geminiKey && !defaults.hasGeminiKey && !preview.audioReady)
-    return requireSetting('geminiKey','내레이션에 사용할 Google AI Studio의 Gemini API 키를 입력하세요.');
+  const voice = await voices.forRender();
+  if (voice === undefined) return;
+  if (!voice) {
+    status('error','내레이션 목소리를 선택하세요','목소리를 고른 뒤 ‘이 목소리 사용’을 누르세요.');
+    voices.focus();
+    return;
+  }
   if (!data.outputFolder) return requireSetting('chooseFolder','MP4를 저장할 폴더를 선택하세요.');
   bindBusy(true, true);
+  voices.stop();
   $('settings').open = false;
   persist();
-  status('working','숏츠 제작 중',style.name + ' 스타일로 제작합니다.');
+  status('working','숏츠 제작 중',style.name + ' 스타일과 ' + voice.name + ' 목소리로 제작합니다.');
   $('result').scrollIntoView({block:'nearest'});
   try {
-    const file = await invoke('generate',{job:{...data,apiKey:'',token:preview.token,story:selectedStory,template:style.id}});
-    preview.audioReady = true;
+    const file = await invoke('generate',{job:{...data,apiKey:'',typecastKey:$('typecastKey').value.trim(),
+      voiceId:voice.id,voiceModel:voice.model,token:preview.token,story:selectedStory,template:style.id}});
     $('file').textContent = file;
     $('player').poster = preview.styles.find(s => s.id === style.id).image;
     $('player').src = convertFileSrc(file);
@@ -232,7 +247,7 @@ $('chooseFolder').onclick = async () => {
 try {
   defaults = await invoke('defaults');
   if (defaults.hasKey) $('key').placeholder = '환경 변수 키 사용 중';
-  if (defaults.hasGeminiKey) $('geminiKey').placeholder = '환경 변수 키 사용 중';
+  if (defaults.hasTypecastKey) $('typecastKey').placeholder = '환경 변수 키 사용 중';
   $('folder').value = saved.folder || defaults.outputFolder;
   await window.__TAURI__.event.listen('render-progress',({payload}) => {
     if (working) $('message').textContent = payload;

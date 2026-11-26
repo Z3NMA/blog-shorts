@@ -19,6 +19,7 @@ struct Studio {
     busy: AtomicBool,
     project: Mutex<Option<Project>>,
     last_file: Mutex<Option<PathBuf>>,
+    voice_cache: PathBuf,
 }
 
 struct Project {
@@ -45,7 +46,6 @@ impl Drop for Project {
 struct Preview {
     token: String,
     manifest: String,
-    audio_ready: bool,
 }
 
 #[derive(Deserialize)]
@@ -54,7 +54,11 @@ struct Job {
     url: String,
     api_key: String,
     #[serde(default)]
-    gemini_key: String,
+    typecast_key: String,
+    #[serde(default)]
+    voice_id: String,
+    #[serde(default)]
+    voice_model: String,
     #[serde(default)]
     token: String,
     #[serde(default)]
@@ -71,7 +75,7 @@ struct Job {
 #[serde(rename_all = "camelCase")]
 struct Defaults {
     has_key: bool,
-    has_gemini_key: bool,
+    has_typecast_key: bool,
     output_folder: String,
 }
 
@@ -98,7 +102,7 @@ fn defaults(app: AppHandle) -> Result<Defaults, String> {
         .join("Blog Shorts");
     Ok(Defaults {
         has_key: env::var("DEEPSEEK_API_KEY").is_ok_and(|v| !v.trim().is_empty()),
-        has_gemini_key: env::var("GEMINI_API_KEY").is_ok_and(|v| !v.trim().is_empty()),
+        has_typecast_key: env::var("TYPECAST_API_KEY").is_ok_and(|v| !v.trim().is_empty()),
         output_folder: folder.to_string_lossy().into_owned(),
     })
 }
@@ -112,6 +116,7 @@ fn command(executable: &str) -> Command {
     }
     cmd.env_remove("DEEPSEEK_API_KEY")
         .env_remove("GEMINI_API_KEY")
+        .env_remove("TYPECAST_API_KEY")
         .stdin(Stdio::null());
     cmd
 }
@@ -207,18 +212,19 @@ fn stamp() -> Result<u128, String> {
         .map_err(|e| e.to_string())
 }
 
-fn engine(app: &AppHandle, project: &Project, workspace: &Path) -> Result<Command, String> {
+fn node_script(app: &AppHandle, name: &str) -> Result<Command, String> {
+    let resource = format!("engine/{name}");
     let script = app
         .path()
         .resource_dir()
         .map_err(|e| e.to_string())?
-        .join("engine/shorts.mjs");
+        .join(&resource);
     let script = if script.is_file() {
         script
-    } else if let Some(p) = adjacent("engine/shorts.mjs") {
+    } else if let Some(p) = adjacent(&resource) {
         p
     } else if cfg!(debug_assertions) {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../shorts.mjs")
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(name)
     } else {
         return Err("제작 엔진을 찾을 수 없습니다. 배포용 blog-shorts.exe를 다시 실행하세요.".into());
     };
@@ -231,17 +237,21 @@ fn engine(app: &AppHandle, project: &Project, workspace: &Path) -> Result<Comman
         ],
         "Node.js 22 이상",
     )?;
-    let ffmpeg = detect_ffmpeg()?;
     let mut worker = command(&node);
+    worker.arg(script);
+    Ok(worker)
+}
+
+fn engine(app: &AppHandle, project: &Project, workspace: &Path) -> Result<Command, String> {
+    let mut worker = node_script(app, "shorts.mjs")?;
     worker
-        .arg(script)
         .arg(&project.url)
         .env("SHORTS_SESSION", workspace)
         .env("SHORTS_SOURCE_DIR", &project.dir)
         .env_remove("SHORTS_STORY")
-        .env("FFMPEG", ffmpeg)
+        .env("FFMPEG", detect_ffmpeg()?)
         .env("SHORTS_PLANNER", "deepseek")
-        .env("SHORTS_VOICE", "gemini")
+        .env("SHORTS_VOICE", "typecast")
         .env_remove("SHORTS_TEMPLATE")
         .env_remove("SHORTS_PLAN_PATH")
         .env_remove("SHORTS_EDIT")
@@ -265,7 +275,7 @@ fn execute(app: &AppHandle, worker: &mut Command, secret: &str) -> Result<(), St
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
             if line.starts_with("Photos:") {
                 let _ = handle.emit("render-progress", "대본과 장면 구성을 확인했습니다.");
-            } else if line.starts_with("Gemini 음성 · ")
+            } else if line.starts_with("타입캐스트 음성 · ")
                 || line.starts_with("사진 확인 · ")
                 || line.starts_with("DeepSeek 대본 · ")
                 || line.starts_with("영상 합성 · ")
@@ -332,7 +342,6 @@ fn preview_project(app: &AppHandle, job: Job) -> Result<Preview, String> {
     if !job.edit.is_empty() { worker.env("SHORTS_EDIT", &job.edit); }
     execute(app, &mut worker, &secret)?;
     Ok(Preview {
-        audio_ready: workspace.join("voice.ready").is_file(),
         token: project.token.clone(),
         manifest: fs::read_to_string(manifest).map_err(|e| e.to_string())?,
     })
@@ -350,9 +359,9 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
     if !workspace.join("preview.json").is_file() {
         return Err("선택한 이야기의 장면 검토를 마쳐 주세요.".into());
     }
-    let secret = key(&job.gemini_key, "GEMINI_API_KEY");
-    if secret.is_empty() && !workspace.join("voice.ready").is_file() {
-        return Err("Gemini API 키를 입력하세요.".into());
+    let secret = key(&job.typecast_key, "TYPECAST_API_KEY");
+    if job.voice_id.is_empty() || job.voice_model.is_empty() {
+        return Err("내레이션에 사용할 타입캐스트 목소리를 선택하세요.".into());
     }
     let folder = PathBuf::from(job.output_folder.trim());
     if !folder.is_absolute() {
@@ -382,7 +391,10 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
         .env("SHORTS_ACTION", "render")
         .env("SHORTS_PLAN_PATH", plan)
         .env("SHORTS_TEMPLATE", &job.template)
-        .env("GEMINI_API_KEY", &secret);
+        .env("TYPECAST_API_KEY", &secret)
+        .env("TYPECAST_VOICE_ID", &job.voice_id)
+        .env("TYPECAST_MODEL", &job.voice_model)
+        .env("SHORTS_TYPECAST_CACHE", &state.voice_cache);
     if let Err(error) = execute(app, &mut worker, &secret) {
         let _ = fs::remove_file(&partial);
         return Err(error);
@@ -401,10 +413,10 @@ fn render(app: &AppHandle, job: Job) -> Result<String, String> {
     Ok(file.to_string_lossy().into_owned())
 }
 
-async fn run_task<T: Send + 'static>(
+async fn run_task<J: Send + 'static, T: Send + 'static>(
     app: AppHandle,
-    job: Job,
-    task: fn(&AppHandle, Job) -> Result<T, String>,
+    job: J,
+    task: fn(&AppHandle, J) -> Result<T, String>,
 ) -> Result<T, String> {
     if app.state::<Studio>().busy.swap(true, Ordering::AcqRel) {
         return Err("이미 진행 중인 작업이 있습니다.".into());
@@ -413,6 +425,59 @@ async fn run_task<T: Send + 'static>(
     let result = tauri::async_runtime::spawn_blocking(move || task(&handle, job)).await;
     app.state::<Studio>().busy.store(false, Ordering::Release);
     result.map_err(|e| e.to_string())?
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VoiceRequest {
+    action: String,
+    api_key: String,
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
+    model: String,
+    #[serde(default)]
+    text: String,
+}
+
+fn voice_request(app: &AppHandle, request: VoiceRequest) -> Result<String, String> {
+    let state = app.state::<Studio>();
+    let secret = key(&request.api_key, "TYPECAST_API_KEY");
+    let mut worker = node_script(app, "typecast-voice.mjs")?;
+    match request.action.as_str() {
+        "list" => { worker.arg("list"); }
+        "detail" => { worker.arg("detail").env("TYPECAST_VOICE_ID", request.id); }
+        "preview" => {
+            if request.text.trim().is_empty() || request.text.chars().count() > 2000 {
+                return Err("미리 들을 대사를 1~2,000자로 입력하세요.".into());
+            }
+            worker.arg("preview").env("TYPECAST_TEXT", request.text)
+                .env("TYPECAST_VOICE_ID", request.id).env("TYPECAST_MODEL", request.model)
+                .env("SHORTS_TYPECAST_CACHE", &state.voice_cache);
+        }
+        _ => return Err("목소리 조회 또는 미리 듣기를 선택하세요.".into()),
+    }
+    let output = worker.env("TYPECAST_API_KEY", &secret).output().map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        let mut message = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+        if !secret.is_empty() { message = message.replace(&secret, "[비공개]"); }
+        return Err(message.chars().take(850).collect());
+    }
+    let stdout = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
+    let value = stdout.lines().last().ok_or("타입캐스트 응답을 읽을 수 없습니다.")?;
+    if request.action != "preview" { return Ok(value.to_owned()); }
+    let digest = value.strip_suffix(".wav").ok_or("미리 듣기 파일을 확인할 수 없습니다.")?;
+    if digest.len() != 64 || !digest.bytes().all(|c| c.is_ascii_hexdigit()) {
+        return Err("미리 듣기 파일 이름을 확인할 수 없습니다.".into());
+    }
+    let file = state.voice_cache.join(value);
+    app.asset_protocol_scope().allow_file(&file).map_err(|e| e.to_string())?;
+    Ok(file.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+async fn typecast_voice(app: AppHandle, request: VoiceRequest) -> Result<String, String> {
+    run_task(app, request, voice_request).await
 }
 
 #[tauri::command]
@@ -443,10 +508,15 @@ fn open_output(app: AppHandle) -> Result<(), String> {
 
 fn main() {
     tauri::Builder::default()
-        .manage(Studio::default())
+        .manage(Studio {
+            voice_cache: env::temp_dir().join(format!("blog-shorts-voices-{}-{}",
+                std::process::id(), stamp().expect("voice cache timestamp"))),
+            ..Studio::default()
+        })
         .invoke_handler(tauri::generate_handler![
             defaults,
             choose_folder,
+            typecast_voice,
             prepare,
             generate,
             open_output
@@ -455,6 +525,7 @@ fn main() {
         .expect("Blog Shorts startup failed")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                let _ = fs::remove_dir_all(&app.state::<Studio>().voice_cache);
                 if let Ok(mut slot) = app.state::<Studio>().project.try_lock() {
                     slot.take();
                 }

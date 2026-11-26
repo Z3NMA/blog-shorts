@@ -1,0 +1,28 @@
+// Editorial selection from Typecast's awards, creator favorites and character features.
+// Sources are linked in desktop/README.md. The order is editorial, not a live usage ranking.
+export const popularVoices = [
+  {id:'tc_6059dad0b83880769a50502f', name:'박창수', english:'Changsu', usage:'대화'},
+  {id:'tc_666a9871abcf27a5169850d0', name:'소진', english:'Sojin', usage:'스토리텔링'},
+  {id:'tc_68257f68bc6e3c161ab5078d', name:'필재', english:'Piljae', usage:'대화'},
+  {id:'tc_68785db8ba9cd7503f27d921', name:'고운', english:'Gowoon', usage:'대화'},
+  {id:'tc_6596849ea3ecaa12a8b13989', name:'봉규', english:'Bonggyu', usage:'쇼츠'},
+  {id:'tc_66596206b7bd6e89c3a2c54e', name:'아찌', english:'Azzi', usage:'대화'},
+  {id:'tc_69f2e455ea79fd197aa0476f', name:'서현', english:'Seohyeon', usage:'아나운서'},
+  {id:'tc_692799c46508f6b9468c54c7', name:'다은', english:'Daeun', usage:'쇼츠'},
+  {id:'tc_68f9c6a72f0f04a417bb136f', name:'문정', english:'Moonjung', usage:'강의·해설'},
+  {id:'tc_632293f759d649937b97f323', name:'진우', english:'Jinwoo', usage:'다큐멘터리'},
+  {id:'tc_62e8f21e979b3860fe2f6a24', name:'혜리', english:'Hyelee', usage:'쇼츠'},
+  {id:'tc_611c3f692fac944dff493a04', name:'세희', english:'SeHee', usage:'다큐멘터리'},
+  {id:'tc_5d01a52563338e00072b8c9c', name:'주하', english:'Juha', usage:'스토리텔링'},
+  {id:'tc_60478557f12456064b353409', name:'발키리', english:'Valkyrie', usage:'쇼츠'},
+  {id:'tc_660e46188b5f4761eb8e36d6', name:'공철', english:'Gongchul', usage:'광고'},
+  {id:'tc_68d4b115f0486108a7eefb37', name:'강일', english:'Kangil', usage:'라디오'},
+  {id:'tc_68ddea1e462b169ddd20b74d', name:'이현', english:'Leehyun', usage:'강의·해설'},
+  {id:'tc_6731b3ac075b04a944644234', name:'한영', english:'Hanyoung', usage:'라디오'},
+  {id:'tc_628d9dac4b8771d984874644', name:'대길', english:'Daegil', usage:'다큐멘터리'},
+  {id:'tc_6335062fd260d463f7d7abb9', name:'현주', english:'Hyunju', usage:'다큐멘터리'},
+  {id:'tc_61e748d0fd9fb2d2cacbb04d', name:'예나', english:'Yena', usage:'대화'},
+  {id:'tc_618b1849ef7827cfea34ea1e', name:'한준', english:'Hanjun', usage:'다큐멘터리'},
+  {id:'tc_646f0dac2465b38f37787f64', name:'다현', english:'Dahyeon', usage:'쇼츠'},
+  {id:'tc_642f9d147ce3f79717423466', name:'소혜', english:'Sohye', usage:'강의·해설'},
+];

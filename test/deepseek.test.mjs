@@ -66,6 +66,18 @@ test('두 단계 모두 사진 번호와 인용을 확인한다', async () => {
   await assert.rejects(planFor({...next, photo:1}), /마무리/);
 });
 
+test('중간 장면이 9개 이상이어도 마지막 장면까지 순서대로 보존한다', async () => {
+  const photos = Array.from({length:14}, (_, i) => ({lines:[`사진 ${i + 1}에 빵이 있어요.`]}));
+  const scenes = photos.map(({lines:[text]}, i) => ({photo:i + 1, text, evidence:text}));
+  const first = scenes[0];
+  const last = scenes.at(-1);
+  const plan = await createDeepSeekPlan('빵집', '', photos, {
+    apiKey:'test', selectedOpening:{title:'빵집', photo:first.photo, evidence:first.evidence},
+    request:writerAndReviewer({openingText:first.text, scenes:scenes.slice(1,-1), closing:last}, {wrapUp}),
+  });
+  assert.deepEqual(plan.scenes, [...scenes.slice(0,-1), {...last, text:last.text + ' ' + wrapUp}]);
+});
+
 test('마지막 사진을 중간과 중복해도 근거 있는 마무리 대사가 맨 끝에 남는다', async () => {
   const middle = {...scene, photo:2};
   const closing = {photo:3, text:'마지막 한 입도 빵과 함께 먹기 좋아요.', evidence:scene.evidence};

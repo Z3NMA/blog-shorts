@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createDeepSeekPlan, proposeStories, setReviewEnding, suggestReviewEnding} from '../engine/deepseek-planner.mjs';
-import {editScenes} from '../engine/scene-editor.mjs';
+import {editScenes, videoPlan} from '../engine/scene-editor.mjs';
 
 const photos = [
   {lines:['산 너머에 가게가 있어요.']}, {lines:['모닝빵에 고기를 넣어요.']},
@@ -71,4 +71,19 @@ test('한 장면 영상에서도 AI 마무리는 방금 수정한 경험담을 �
   const result = editScenes(plan, {scenes,ending:text}, photos, []);
   assert.equal(result.scenes[0].text, scenes[0].text + ' ' + text);
   assert.equal(plan.ending.body, '산을 봐요.');
+});
+
+test('뺀 장면은 원래 자리에 복구할 수 있고 마무리 추천에는 남긴 장면만 전달한다', async () => {
+  const plan = {title:'빵집', scenes:photos.slice(0,3).map((p,i) => ({photo:i+1,text:p.lines[0]}))};
+  setReviewEnding(plan, '빵을 나눠 드셔 보세요.');
+  const saved = editScenes(plan, {scenes:[{},{excluded:true,text:''},{}]}, photos, []);
+  const current = videoPlan(saved);
+  assert.deepEqual(current.scenes.map(s => s.photo),[1,3]);
+  await suggestReviewEnding(current, {apiKey:'test',request:async (_, init) => {
+    const input = JSON.parse(JSON.parse(init.body).messages[1].content);
+    assert.deepEqual(input.scenes.map(s => s.photo),[1,3]);
+    return reply({wrapUp:'따뜻한 빵을 즐겨 보세요.'});
+  },priceSources:photos.flatMap(p => p.lines)});
+  assert.deepEqual(videoPlan(editScenes(saved, {scenes:[{},{excluded:false},{}]}, photos, [])),plan);
+  assert.throws(() => editScenes(saved, {scenes:[{excluded:true},{},{excluded:true}]}, photos, []), /하나 이상/);
 });

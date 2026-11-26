@@ -26,9 +26,9 @@ test('첫 사진 교체는 대사를 보존하고, 손상된 마지막 사진은
     await writeFile(file('1.jpg'),ppm(40));
     await writeFile(file('2.jpg'),ppm(190));
     await writeFile(file('3.jpg'),'broken');
-    const worker = (action,edit={}) => spawnSync(process.execPath,[engine,'https://blog.naver.com/test/123',file('out.mp4')],{
+    const worker = (action,edit={}, exportPlan='') => spawnSync(process.execPath,[engine,'https://blog.naver.com/test/123',file('out.mp4')],{
       env:{...process.env,FFMPEG:ffmpeg,SHORTS_SESSION:dir,PHOTO_DIR:dir,SHORTS_ACTION:action,SHORTS_TEMPLATE:'white',
-        SHORTS_EDIT:JSON.stringify(edit),SHORTS_VOICE:'gemini',GEMINI_API_KEY:'',SHORTS_PLAN_PATH:''},
+        SHORTS_EDIT:JSON.stringify(edit),SHORTS_VOICE:'gemini',GEMINI_API_KEY:'',SHORTS_PLAN_PATH:exportPlan},
       windowsHide:true,encoding:'utf8',
     });
     const success = result => assert.equal(result.status,0,result.stderr);
@@ -53,6 +53,24 @@ test('첫 사진 교체는 대사를 보존하고, 손상된 마지막 사진은
     success(worker('apply',{ending:'따뜻한 식사를 찾으시면 들러 보세요.'}));
     assert.equal(await readFile(file('0.wav'),'utf8'),'cached');
     for (const name of ['1.wav','voice.ready']) await assert.rejects(readFile(file(name)),{code:'ENOENT'});
+    success(worker('apply',{scenes:[{excluded:true},{}]}));
+    assert.equal((await json('preview.json')).photo,3);
+    success(worker('apply',{scenes:[{excluded:false},{excluded:true}]}));
+    assert.equal((await json('preview.json')).photo,2);
+    await assert.rejects(readFile(file('0.wav')),{code:'ENOENT'});
+    success(worker('story'));
+    assert.deepEqual((await json('board.json')).scenes.map(s => s.excluded),[false,true]);
+    success(spawnSync(ffmpeg,['-v','error','-f','lavfi','-i','anullsrc=r=24000:cl=mono',
+      '-t','0.2',file('0.wav')],{windowsHide:true,encoding:'utf8'}));
+    success(worker('render',{},file('out.plan.json')));
+    const exported = await json('out.plan.json');
+    assert.deepEqual(exported.scenes.map(s => s.photo),[2]);
+    assert.equal(exported.ending,undefined);
+    assert.deepEqual(await json('scenes.json'),exported.scenes);
+    assert.equal(await readFile(file('list.txt'),'utf8'),"file '0.mp4'");
+    assert.ok((await readFile(file('out.mp4'))).length > 1000);
+    success(worker('apply',{scenes:[{},{excluded:false}]}));
+    assert.equal((await json('plan.json')).scenes[1].excluded,undefined);
   });
 
 test('같은 글의 두 이야기는 사진을 공유하고 편집된 장면 음성만 폐기한다',

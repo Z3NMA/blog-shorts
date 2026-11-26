@@ -143,6 +143,14 @@ body .scene-photo { grid-column:1/-1; }
 body .scene-media small { overflow-wrap:anywhere; }
 body .scene-media .plain { padding-inline:3px; }
 body .scene-lines { min-width:0; }
+body .scene-toggle { min-height:28px; padding:2px 6px; font-size:13px; }
+body .line-field > .scene-toggle { float:right; color:var(--muted); }
+body .line-field > .scene-toggle:disabled { opacity:.55; cursor:default; }
+body .line-field textarea { clear:both; }
+body .scene-list .excluded-scene { grid-template-columns:minmax(0,1fr) auto; align-items:center; padding:10px 0; }
+body .excluded-summary { display:flex; align-items:baseline; gap:10px; min-width:0; color:var(--muted); font-size:13px; }
+body .excluded-summary strong { flex:none; }
+body .excluded-summary span { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 body .line-field + .line-field { margin-top:10px; }
 body .line-field label { display:block; padding:2px 0 6px; font-weight:650; }
 body .line-field textarea { box-sizing:border-box; display:block; width:100%; min-height:66px; resize:vertical; padding:9px 12px; font:inherit; line-height:1.55; color:var(--ink); background:var(--base); border:1px solid var(--line); border-radius:9px; }

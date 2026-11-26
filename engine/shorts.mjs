@@ -4,7 +4,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createDeepSeekPlan, proposeStories, suggestReviewEnding} from './deepseek-planner.mjs';
-import {editScenes, sceneSources, sourceLines} from './scene-editor.mjs';
+import {editScenes, sceneSources, sourceLines, videoPlan} from './scene-editor.mjs';
 import {parseBlogPost} from './blog-post.mjs';
 import {typecastClip, typecastSelection} from './typecast-voice.mjs';
 
@@ -182,10 +182,11 @@ async function photoCard(number) {
 if (prepare) {
   if (action === 'story') {
     const scenes = [];
-    for (const [i, scene] of plan.scenes.entries()) {
+    const last = plan.scenes.at(-1);
+    for (const scene of plan.scenes) {
       scenes.push({...await photoCard(scene.photo), evidence:scene.evidence,
         evidencePhoto:scene.evidencePhoto ?? scene.photo,
-        text:i === plan.scenes.length - 1 && plan.ending ? plan.ending.body : scene.text});
+        excluded:Boolean(scene.excluded), text:scene === last && plan.ending ? plan.ending.body : scene.text});
     }
     save('board.json', JSON.stringify({title:plan.title, articleTitle:title, scenes, ending:plan.ending}));
     process.exit(0);
@@ -202,14 +203,15 @@ if (prepare) {
     process.exit(0);
   }
   if (action === 'ending') {
-    const current = editScenes(plan, edit, photos, introduction, {suggesting:true});
+    const current = videoPlan(editScenes(plan, edit, photos, introduction, {suggesting:true}));
     const priceSources = current.scenes.flatMap(scene => sceneSources(scene, photos, introduction));
     const text = await suggestReviewEnding(current, {previous:edit.ending || plan.ending?.text, priceSources});
     save('suggestion.json',JSON.stringify({text}));
     process.exit(0);
   }
-  const original = plan;
-  if (action === 'apply') plan = editScenes(original, edit, photos, introduction);
+  const original = videoPlan(plan);
+  const edited = action === 'apply' ? editScenes(plan, edit, photos, introduction) : plan;
+  plan = videoPlan(edited);
   const first = plan.scenes[0];
   const previous = existsSync(local('preview.json')) ? JSON.parse(readFileSync(local('preview.json'),'utf8')) : {};
   let styles = previous.styles;
@@ -225,18 +227,20 @@ if (prepare) {
     }
   }
   if (action === 'apply') {
-    for (const [index, scene] of plan.scenes.entries()) {
-      if (scene.text !== original.scenes[index].text) {
+    for (let index = 0; index < Math.max(original.scenes.length, plan.scenes.length); index++) {
+      const changedEnding = (index === plan.scenes.length - 1) !== (index === original.scenes.length - 1);
+      if (changedEnding || plan.scenes[index]?.text !== original.scenes[index]?.text) {
         rmSync(local('voice.ready'), {force:true});
         rmSync(local(index + '.wav'), {force:true});
       }
     }
-    save('plan.json',JSON.stringify(plan,null,2));
+    save('plan.json',JSON.stringify(edited,null,2));
   }
   save('preview.json', JSON.stringify({title:plan.title, articleTitle:title, styles,
     photo:first.photo, firstText:first.text, ending:plan.ending}));
   process.exit(0);
 }
+plan = videoPlan(plan);
 const template = templates.find(t => t.id === (process.env.SHORTS_TEMPLATE || plan.template || 'white'));
 if (!template) throw Error('영상 스타일을 다시 선택하세요.');
 const provider = process.env.SHORTS_VOICE || plan.narration?.provider;

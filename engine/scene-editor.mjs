@@ -10,14 +10,24 @@ export function sceneSources(scene, photos, introduction) {
   return [...numbers].flatMap(number => sourceLines(photos, introduction, number));
 }
 
+export function videoPlan(plan) {
+  const scenes = plan.scenes.filter(scene => !scene.excluded);
+  if (!scenes.length) throw Error('영상에 사용할 장면을 하나 이상 남겨 주세요.');
+  const video = {...plan, scenes};
+  if (plan.scenes.at(-1).excluded) delete video.ending;
+  return video;
+}
+
 // The final experience and recommendation are edited separately and spoken together.
 export function editScenes(original, edit, photos, introduction, {suggesting = false} = {}) {
   const plan = structuredClone(original);
-  const last = plan.scenes.length - 1;
-  if (edit.scenes !== undefined && (!Array.isArray(edit.scenes) || edit.scenes.length !== last + 1))
+  if (edit.scenes !== undefined && (!Array.isArray(edit.scenes) || edit.scenes.length !== plan.scenes.length))
     throw Error('편집할 장면 수가 달라졌습니다. 대본을 다시 여세요.');
   for (const [index, scene] of plan.scenes.entries()) {
     const change = edit.scenes?.[index] ?? (index === 0 && edit.photo != null ? {photo:edit.photo} : {});
+    if (change.excluded === true) scene.excluded = true;
+    if (change.excluded === false) delete scene.excluded;
+    if (scene.excluded) continue;
     const number = change.photo ?? scene.photo;
     if (!Number.isInteger(number) || !photos[number - 1] || (number !== scene.photo && photos[number - 1].isCover))
       throw Error(`${index + 1}번째 장면에 사용할 본문 사진을 선택하세요.`);
@@ -27,20 +37,23 @@ export function editScenes(original, edit, photos, introduction, {suggesting = f
       if (number === scene.evidencePhoto) delete scene.evidencePhoto;
     }
     if (change.text === undefined) continue;
-    const body = index === last && plan.ending ? plan.ending.body : scene.text;
     const text = typeof change.text === 'string' ? change.text.trim() : '';
     if (!text || text.length > 180 || /[\x00-\x1f\x7f]/u.test(text))
       throw Error(`${index + 1}번째 장면 대사는 줄바꿈 없이 1~180자로 입력하세요.`);
+    const isEnding = index === plan.scenes.length - 1 && plan.ending;
+    const body = isEnding ? plan.ending.body : scene.text;
     if (text !== body || number !== original.scenes[index].photo) {
       try { verifyPrices(text, sceneSources(scene, photos, introduction)); }
       catch (error) { throw Error(`${index + 1}번째 장면 · ${error.message}`); }
     }
-    if (index === last && plan.ending) plan.ending.body = text;
+    if (isEnding) plan.ending.body = text;
     else scene.text = text;
   }
-  if (!suggesting && (edit.ending !== undefined || (edit.scenes && plan.ending))) {
-    const sources = plan.scenes.flatMap(scene => sceneSources(scene, photos, introduction));
-    setReviewEnding(plan, edit.ending ?? plan.ending.text, sources);
+  const included = videoPlan(plan);
+  if (!suggesting && !plan.scenes.at(-1).excluded && (edit.ending !== undefined || (edit.scenes && plan.ending))) {
+    const sources = included.scenes.flatMap(scene => sceneSources(scene, photos, introduction));
+    setReviewEnding(included, edit.ending ?? plan.ending.text, sources);
+    plan.ending = included.ending;
   }
   return plan;
 }

@@ -34,7 +34,7 @@ export function createSceneBoard({loadPhotos, rewrite, run}) {
   function showPhotos() {
     const choices = library.map(photo => {
       const selected = board.scenes[active].photo === photo.photo;
-      const used = board.scenes.some((s, i) => i !== active && s.photo === photo.photo);
+      const used = board.scenes.some((s, i) => i !== active && !s.excluded && s.photo === photo.photo);
       const button = element('button', 'photo-choice');
       button.type = 'button';
       button.disabled = !photo.image;
@@ -98,9 +98,27 @@ export function createSceneBoard({loadPhotos, rewrite, run}) {
     group.append(caption, input);
     return group;
   }
-  function row(scene, index) {
+  function row(scene, index, count) {
     const item = element('li', 'scene-row');
     item.id = 'row-' + index;
+    const name = '장면 ' + (index + 1);
+    const toggle = element('button', 'plain scene-toggle', scene.excluded ? '다시 넣기' : '장면 빼기');
+    Object.assign(toggle, {id:'toggle-' + index, type:'button', disabled:!scene.excluded && count === 1});
+    toggle.setAttribute('aria-label', name + (scene.excluded ? ' 다시 넣기' : ' 빼기'));
+    if (toggle.disabled) toggle.title = '영상에 사용할 장면이 하나 필요합니다.';
+    toggle.onclick = () => {
+      closePhotos();
+      scene.excluded = !scene.excluded;
+      renderRows();
+      $('toggle-' + index).focus();
+    };
+    if (scene.excluded) {
+      item.classList.add('excluded-scene');
+      const summary = element('div', 'excluded-summary');
+      summary.append(element('strong', '', name + ' 제외됨'), element('span', '', scene.text));
+      item.append(summary, toggle);
+      return item;
+    }
     const media = element('div', 'scene-media');
     const frame = element('div', 'scene-photo');
     frame.id = 'photo-' + index;
@@ -113,8 +131,9 @@ export function createSceneBoard({loadPhotos, rewrite, run}) {
     change.onclick = () => openPhotos(index);
     media.append(frame, number, change);
     const lines = element('div', 'scene-lines');
-    const name = '장면 ' + (index + 1);
-    lines.append(field('line-' + index, name + ' 대사', scene.text, 180, value => {scene.text = value;}));
+    const dialogue = field('line-' + index, name + ' 대사', scene.text, 180, value => {scene.text = value;});
+    dialogue.prepend(toggle);
+    lines.append(dialogue);
     if (index === board.scenes.length - 1 && board.ending) {
       const ending = field('ending', '이어서 읽을 마지막 멘트', board.ending.text, 90, value => {board.ending.text = value;});
       const button = element('button', 'plain rewrite', 'AI로 다시 쓰기');
@@ -134,15 +153,20 @@ export function createSceneBoard({loadPhotos, rewrite, run}) {
     item.append(media, lines);
     return item;
   }
+  function renderRows() {
+    const count = board.scenes.filter(scene => !scene.excluded).length;
+    const excluded = board.scenes.length - count;
+    $('sceneCount').textContent = '영상에 ' + count + '개 장면' + (excluded ? ' · ' + excluded + '개 제외' : '');
+    $('scenes').replaceChildren(...board.scenes.map((scene, index) => row(scene, index, count)));
+    board.scenes.forEach((scene, index) => { if (!scene.excluded) displayPhoto(index); });
+  }
   return {
     show(data, newArticle = false) {
       closePhotos();
       if (newArticle) { library = []; total = 0; }
       board = data;
       $('boardTitle').textContent = data.title.replaceAll('\n', ' ');
-      $('sceneCount').textContent = data.scenes.length + '개 장면';
-      $('scenes').replaceChildren(...data.scenes.map(row));
-      data.scenes.forEach((_, index) => displayPhoto(index));
+      renderRows();
     },
     edits(suggesting = false) {
       const fields = [...$('scenes').querySelectorAll('textarea')];
@@ -153,8 +177,8 @@ export function createSceneBoard({loadPhotos, rewrite, run}) {
           /[\x00-\x1f\x7f]/u.test(text) ? '대사는 줄바꿈 없이 한 줄로 입력하세요.' : '');
         if (!input.reportValidity()) return null;
       }
-      const scenes = board.scenes.map(s => ({photo:s.photo, text:s.text.trim()}));
-      return board.ending ? {scenes, ending:board.ending.text.trim()} : {scenes};
+      const scenes = board.scenes.map(s => ({photo:s.photo, text:s.text.trim(), excluded:Boolean(s.excluded)}));
+      return board.ending && !board.scenes.at(-1).excluded ? {scenes, ending:board.ending.text.trim()} : {scenes};
     },
     setEnding(text) {
       board.ending.text = text;
